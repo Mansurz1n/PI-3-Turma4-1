@@ -60,7 +60,7 @@
                     .padding(horizontal = 16.dp),
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(250.dp))
+            Spacer(modifier = Modifier.height(200.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(top = 24.dp)
@@ -70,7 +70,7 @@
                     onCheckedChange = { acceptTerms = it }
                 )
                 val termosTexto = buildAnnotatedString {
-                    withStyle(style = SpanStyle(color = Color.White)) {
+                    withStyle(style = SpanStyle()) {
                         append("Li e aceito os ")
                     }
                     pushStringAnnotation(tag = "TERMS", annotation = "https://www.youtube.com/watch?v=dQw4w9WgXcQ")

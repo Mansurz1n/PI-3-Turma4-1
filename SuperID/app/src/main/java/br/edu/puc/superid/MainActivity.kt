@@ -12,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import br.edu.puc.superid.ui.IntroScreen
+import br.edu.puc.superid.ui.RegisterScreen
 import br.edu.puc.superid.ui.theme.SuperIDTheme
 //import br.edu.puc.superid.ui.RegisterScreen TODO: tela de registro
 
@@ -39,7 +40,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("register") {
-                           // RegisterScreen()
+                            RegisterScreen(navController)
                         }
                     }
                 }
