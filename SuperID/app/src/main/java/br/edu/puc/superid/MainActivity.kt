@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
 
         limparBancoFirestore()
 
-        requestPermissionLauncher = registerForActivityResult(
+        /*requestPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { isGranted: Boolean ->
             val msg = if (isGranted) "Permissão concedida!" else "Permissão negada."
@@ -46,8 +46,8 @@ class MainActivity : ComponentActivity() {
         }
 
         pedirPermissaoTelefone()
+         */
         enableEdgeToEdge()
-
         setContent {
             SuperIDTheme {
                 val navController = rememberNavController()
