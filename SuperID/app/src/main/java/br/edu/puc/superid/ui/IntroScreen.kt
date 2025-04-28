@@ -69,10 +69,11 @@
                     checked = acceptTerms,
                     onCheckedChange = { acceptTerms = it }
                 )
+                Text(
+                    text = "Li e aceito ",
+                    style = MaterialTheme.typography.bodyMedium
+                )
                 val termosTexto = buildAnnotatedString {
-                    withStyle(style = SpanStyle()) {
-                        append("Li e aceito os ")
-                    }
                     pushStringAnnotation(tag = "TERMS", annotation = "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
                     withStyle(style = SpanStyle(color = Color(0xFF42A5F5))) {
                         append("termos de uso")

@@ -101,7 +101,7 @@ fun RegisterScreen(navController: NavController) {
                                     db.collection("usuarios").document(uid).set(usuario)
                                         .addOnSuccessListener {
                                             Toast.makeText(context, "Verifique seu e-mail!", Toast.LENGTH_LONG).show()
-                                            navController.navigate("second/${name}/${email}/${senha}")
+                                            navController.navigate("login")
                                         }
                                         .addOnFailureListener {
                                             Toast.makeText(context, "Erro ao salvar dados: ${it.message}", Toast.LENGTH_LONG).show()
