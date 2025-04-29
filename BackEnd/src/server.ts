@@ -1,7 +1,11 @@
 import express from "express";
 import cors from "cors";
 import {Router} from "express";
-import { Login } from "./config/Account";
+import { InfoAdd} from "./config/Account";
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, getDocs } from 'firebase/firestore/lite';
+
+
 
 
 
@@ -12,7 +16,7 @@ const routes = Router();
 
 
 server.use(cors());
-routes.get('/',Login.InfoAdd)
+routes.get('/',InfoAdd);
 
 
 
