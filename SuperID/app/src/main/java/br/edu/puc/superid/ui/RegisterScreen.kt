@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -87,7 +88,9 @@ fun RegisterScreen(navController: NavController) {
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable {
                         mostrarDialogo = true
-                    }
+                    },
+                    style = LocalTextStyle.current.copy(
+                        textDecoration = TextDecoration.Underline)
                 )
             }
         }
@@ -160,7 +163,11 @@ fun RegisterScreen(navController: NavController) {
                 navController.navigate("login")
             }
         ) {
-            Text("Já possuo uma conta")
+            Text(text = "Já possuo conta",
+                color = MaterialTheme.colorScheme.primary,
+                    style = LocalTextStyle.current.copy(
+                    textDecoration = TextDecoration.Underline)
+            )
         }
     }
 
@@ -180,7 +187,7 @@ fun RegisterScreen(navController: NavController) {
                 ) {
                     Text(
                         """
-                        1️⃣ Aceitação da Zueira
+                        1️⃣ Aceitação
                         Ao utilizar este aplicativo, você automaticamente concorda com absolutamente tudo que está escrito aqui, mesmo sem ter lido nada (porque ninguém lê, né?). Qualquer choro posterior será ignorado com sucesso.
 
                         2️⃣ Coleta de Dados (ou quase isso)
