@@ -60,9 +60,7 @@
                             modifier = Modifier.padding(innerPadding)
                         ) {
                             composable("intro") {
-                                IntroScreen {
-                                    navController.navigate("register")
-                                }
+                                IntroScreen(navController) // Agora a IntroScreen usa navController diretamente
                             }
                             composable("register") {
                                 RegisterScreen(navController)
@@ -72,6 +70,7 @@
                             }
                             composable("home") {
                                 HomeScreen(navController)
+                            }
                         }
                     }
                 }
@@ -141,4 +140,4 @@
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
-    }}
+    }
