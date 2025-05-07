@@ -1,10 +1,9 @@
 package br.edu.puc.superid.ui
 
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -25,7 +24,11 @@ import com.google.firebase.auth.FirebaseAuth
 fun LoginScreen(navController: NavController) {
     var email by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
+    var showResetDialog by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
+
     val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
 
     Column(
         modifier = Modifier
@@ -65,13 +68,7 @@ fun LoginScreen(navController: NavController) {
             color = MaterialTheme.colorScheme.primary,
             textDecoration = TextDecoration.Underline,
             modifier = Modifier
-                .clickable {
-                    val intent = Intent(
-                        Intent.ACTION_VIEW,
-                        Uri.parse("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-                    )
-                    context.startActivity(intent)
-                }
+                .clickable { showResetDialog = true }
                 .padding(4.dp)
         )
 
@@ -80,19 +77,17 @@ fun LoginScreen(navController: NavController) {
         Button(
             onClick = {
                 if (email.isNotBlank() && senha.isNotBlank()) {
-                    FirebaseAuth.getInstance()
-                        .signInWithEmailAndPassword(email, senha)
+                    auth.signInWithEmailAndPassword(email, senha)
                         .addOnCompleteListener { task ->
                             if (task.isSuccessful) {
-                                val user = FirebaseAuth.getInstance().currentUser
-                                if (user != null && user.isEmailVerified) {
-                                    Toast.makeText(context, "Login bem-sucedido!", Toast.LENGTH_SHORT).show()
-                                    navController.navigate("home")
-                                } else {
-                                    Toast.makeText(context, "Verifique seu e-mail cadastrado.", Toast.LENGTH_LONG).show()
-                                }
+                                Toast.makeText(context, "Login bem-sucedido!", Toast.LENGTH_SHORT).show()
+                                navController.navigate("home")
                             } else {
-                                Toast.makeText(context, "Erro no login: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(
+                                    context,
+                                    "Erro no login: ${task.exception?.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         }
                 } else {
@@ -116,5 +111,56 @@ fun LoginScreen(navController: NavController) {
                 textDecoration = TextDecoration.Underline
             )
         }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Recuperar Senha") },
+            text = {
+                Column {
+                    Text("Informe seu e-mail para receber o link de redefinição:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = resetEmail,
+                        onValueChange = { resetEmail = it },
+                        label = { Text("E-mail") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (resetEmail.isNotBlank()) {
+                        auth.sendPasswordResetEmail(resetEmail)
+                            .addOnCompleteListener { resetTask ->
+                                if (resetTask.isSuccessful) {
+                                    Toast.makeText(
+                                        context,
+                                        "Link enviado para $resetEmail",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        "Erro: ${resetTask.exception?.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                    } else {
+                        Toast.makeText(context, "Digite um e-mail válido", Toast.LENGTH_SHORT).show()
+                    }
+                    showResetDialog = false
+                }) {
+                    Text("Enviar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
