@@ -1,5 +1,6 @@
 package br.edu.puc.superid.ui
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 
 @Composable
 fun LoginScreen(navController: NavController) {
@@ -26,6 +28,7 @@ fun LoginScreen(navController: NavController) {
     var senha by remember { mutableStateOf("") }
     var showResetDialog by remember { mutableStateOf(false) }
     var resetEmail by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
@@ -68,7 +71,10 @@ fun LoginScreen(navController: NavController) {
             color = MaterialTheme.colorScheme.primary,
             textDecoration = TextDecoration.Underline,
             modifier = Modifier
-                .clickable { showResetDialog = true }
+                .clickable {
+                    resetEmail = email  // Preenche automaticamente com o email do campo de login
+                    showResetDialog = true
+                }
                 .padding(4.dp)
         )
 
@@ -77,22 +83,22 @@ fun LoginScreen(navController: NavController) {
         Button(
             onClick = {
                 if (email.isNotBlank() && senha.isNotBlank()) {
+                    isLoading = true
                     auth.signInWithEmailAndPassword(email, senha)
                         .addOnCompleteListener { task ->
+                            isLoading = false
                             if (task.isSuccessful) {
                                 val user = auth.currentUser
-                                // Verifica se o e-mail foi verificado
                                 if (user != null && user.isEmailVerified) {
                                     Toast.makeText(context, "Login bem-sucedido!", Toast.LENGTH_SHORT).show()
                                     navController.navigate("home")
                                 } else {
-                                    // Se o e-mail não foi verificado
                                     Toast.makeText(context, "Por favor, verifique seu e-mail antes de fazer login.", Toast.LENGTH_LONG).show()
                                 }
                             } else {
                                 Toast.makeText(
                                     context,
-                                    "Erro no login: ${task.exception?.message?.split(":")?.last()?.trim() ?: "Erro desconhecido"}",
+                                    "Erro no login: ${task.exception?.message ?: "Erro desconhecido"}",
                                     Toast.LENGTH_LONG
                                 ).show()
                             }
@@ -101,7 +107,8 @@ fun LoginScreen(navController: NavController) {
                     Toast.makeText(context, "Preencha todos os campos!", Toast.LENGTH_SHORT).show()
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
         ) {
             Text("Entrar")
         }
@@ -137,36 +144,36 @@ fun LoginScreen(navController: NavController) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    if (resetEmail.isNotBlank()) {
-                        // Verificação se o e-mail está associado a um usuário
-                        auth.fetchSignInMethodsForEmail(resetEmail).addOnCompleteListener { emailTask ->
-                            if (emailTask.isSuccessful && emailTask.result?.signInMethods?.isNotEmpty() == true) {
-                                auth.sendPasswordResetEmail(resetEmail)
-                                    .addOnCompleteListener { resetTask ->
-                                        if (resetTask.isSuccessful) {
-                                            Toast.makeText(
-                                                context,
-                                                "Link enviado para $resetEmail",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        } else {
-                                            Toast.makeText(
-                                                context,
-                                                "Erro: ${resetTask.exception?.message?.split(":")?.last()?.trim() ?: "Erro desconhecido"}",
-                                                Toast.LENGTH_LONG
-                                            ).show()
-                                        }
+                TextButton(
+                    onClick = {
+                        if (resetEmail.isNotBlank()) {
+                            isLoading = true
+
+                            // Tenta enviar email de redefinição sem verificação prévia
+                            auth.sendPasswordResetEmail(resetEmail.trim())
+                                .addOnSuccessListener {
+                                    isLoading = false
+                                    Toast.makeText(context, "Link de recuperação enviado para $resetEmail", Toast.LENGTH_LONG).show()
+                                    showResetDialog = false
+                                }
+                                .addOnFailureListener { exception ->
+                                    isLoading = false
+                                    Log.e("FirebaseAuth", "Erro na recuperação de senha", exception)
+
+                                    // Verifica o tipo específico de erro
+                                    val errorMsg = when (exception) {
+                                        is FirebaseAuthInvalidUserException -> "Este email não está registrado no sistema."
+                                        else -> "Erro: ${exception.message}"
                                     }
-                            } else {
-                                Toast.makeText(context, "Este e-mail não está associado a uma conta.", Toast.LENGTH_SHORT).show()
-                            }
+
+                                    Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                                }
+                        } else {
+                            Toast.makeText(context, "Digite um e-mail válido", Toast.LENGTH_SHORT).show()
                         }
-                    } else {
-                        Toast.makeText(context, "Digite um e-mail válido", Toast.LENGTH_SHORT).show()
-                    }
-                    showResetDialog = false
-                }) {
+                    },
+                    enabled = !isLoading
+                ) {
                     Text("Enviar")
                 }
             },
