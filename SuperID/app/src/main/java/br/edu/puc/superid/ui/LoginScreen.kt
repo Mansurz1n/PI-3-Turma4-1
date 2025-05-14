@@ -80,12 +80,19 @@ fun LoginScreen(navController: NavController) {
                     auth.signInWithEmailAndPassword(email, senha)
                         .addOnCompleteListener { task ->
                             if (task.isSuccessful) {
-                                Toast.makeText(context, "Login bem-sucedido!", Toast.LENGTH_SHORT).show()
-                                navController.navigate("home")
+                                val user = auth.currentUser
+                                // Verifica se o e-mail foi verificado
+                                if (user != null && user.isEmailVerified) {
+                                    Toast.makeText(context, "Login bem-sucedido!", Toast.LENGTH_SHORT).show()
+                                    navController.navigate("home")
+                                } else {
+                                    // Se o e-mail não foi verificado
+                                    Toast.makeText(context, "Por favor, verifique seu e-mail antes de fazer login.", Toast.LENGTH_LONG).show()
+                                }
                             } else {
                                 Toast.makeText(
                                     context,
-                                    "Erro no login: ${task.exception?.message}",
+                                    "Erro no login: ${task.exception?.message?.split(":")?.last()?.trim() ?: "Erro desconhecido"}",
                                     Toast.LENGTH_LONG
                                 ).show()
                             }
@@ -132,22 +139,29 @@ fun LoginScreen(navController: NavController) {
             confirmButton = {
                 TextButton(onClick = {
                     if (resetEmail.isNotBlank()) {
-                        auth.sendPasswordResetEmail(resetEmail)
-                            .addOnCompleteListener { resetTask ->
-                                if (resetTask.isSuccessful) {
-                                    Toast.makeText(
-                                        context,
-                                        "Link enviado para $resetEmail",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Erro: ${resetTask.exception?.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
+                        // Verificação se o e-mail está associado a um usuário
+                        auth.fetchSignInMethodsForEmail(resetEmail).addOnCompleteListener { emailTask ->
+                            if (emailTask.isSuccessful && emailTask.result?.signInMethods?.isNotEmpty() == true) {
+                                auth.sendPasswordResetEmail(resetEmail)
+                                    .addOnCompleteListener { resetTask ->
+                                        if (resetTask.isSuccessful) {
+                                            Toast.makeText(
+                                                context,
+                                                "Link enviado para $resetEmail",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Erro: ${resetTask.exception?.message?.split(":")?.last()?.trim() ?: "Erro desconhecido"}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                            } else {
+                                Toast.makeText(context, "Este e-mail não está associado a uma conta.", Toast.LENGTH_SHORT).show()
                             }
+                        }
                     } else {
                         Toast.makeText(context, "Digite um e-mail válido", Toast.LENGTH_SHORT).show()
                     }
