@@ -1,7 +1,11 @@
-import {Request, Response} from "express";
+import {Request, response, Response} from "express";
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, query, where, doc } from 'firebase/firestore/lite';
-
+import * as QRCode from 'qrcode';
+import * as adm from 'firebase-admin';
+import * as functions from 'firebase-functions' 
+import { error } from "console";
+import { v4 as uuidv4, v4 } from 'uuid';
 
 
 const firebaseConfig = {
@@ -16,7 +20,7 @@ const firebaseConfig = {
 
     
 
-
+    adm.initializeApp(); 
     const app  = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
@@ -36,8 +40,59 @@ const firebaseConfig = {
        else{
         console.log("Conta Criada:", result2)
        }
-    return 
+    };
+
+    export async function Login(res:Response,req:Request){
+        var email = req.get('email')
+        var token = req.get('token')
+        if(email && token){
+            var result = InfoAdd(email)
+            if(!result){
+                res.send('Conta não criada')
+            }else{
+                res.send(result)
+            }
     }
+    }
+    export async function performAuth(res:Response, req:Request) {
+        const requestData = req.body
+        const apiKey = 'API' 
+        const validAPIKey =  functions.config().api.key//firebase functions:config:set api.key= "A chave q a gnt for fazer"
+        if(requestData !== apiKey){
+            res.status(401).send('APIKey invalida')
+            return
+        }
+        try{
+            const loginToken = "TokenAleatorio" //pode ser um uuidv4()
+            const logintokenVdd = uuidv4()
+            const dataAtual =  adm.firestore.Timestamp.now();
+            await adm.firestore().collection('logins').doc(logintokenVdd).set({
+                    APIKey: requestData.APIKey,
+                    dataEHorario:dataAtual,
+                    loginToken:logintokenVdd
+                });
+
+            const qrcode = await QRCode.toDataURL(logintokenVdd, {type:'image/png'})
+            
+
+            const responseData = {
+                qrcode:qrcode,
+                loginToken:logintokenVdd
+            }
+
+            res.status(200).json(responseData)
+
+
+
+        }catch(err){
+            console.log(error);
+            response.status(500).send('Erro')
+        }
+
+    }
+
+
+
 
     
 
