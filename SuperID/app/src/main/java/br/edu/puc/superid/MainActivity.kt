@@ -21,6 +21,7 @@
     import androidx.navigation.compose.composable
     import androidx.navigation.compose.rememberNavController
     import androidx.navigation.navArgument
+    import br.edu.puc.superid.ui.AddPasswordScreen
     import br.edu.puc.superid.ui.HomeScreen
     import br.edu.puc.superid.ui.IntroScreen
     import br.edu.puc.superid.ui.LoginScreen
@@ -71,6 +72,10 @@
                             composable("home") {
                                 HomeScreen(navController)
                             }
+                            composable("addPassword") {
+                                AddPasswordScreen(navController)
+                            }
+
                         }
                     }
                 }

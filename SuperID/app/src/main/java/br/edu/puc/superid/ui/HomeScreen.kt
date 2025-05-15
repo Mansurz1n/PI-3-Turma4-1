@@ -36,8 +36,8 @@ fun HomeScreen(navController: NavController) {
                 Button(onClick = { /* TODO: abrir scanner QR Code */ }) {
                     Text("QR Code")
                 }
-                Button(onClick = { /* TODO: adicionar nova senha */ }) {
-                    Text("Adicionar")
+                Button(onClick = { navController.navigate("addPassword") }) {
+                    Text("Adicionar Senha")
                 }
             }
         },
