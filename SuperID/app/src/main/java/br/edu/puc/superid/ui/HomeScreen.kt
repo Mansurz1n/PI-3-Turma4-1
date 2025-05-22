@@ -88,7 +88,9 @@ fun HomeScreen(
                         )
                     }
                 }
-        } else passwordList = emptyList()
+        } else {
+            passwordList = emptyList()
+        }
     }
 
     Scaffold(
@@ -139,32 +141,14 @@ fun HomeScreen(
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) { Text("Editar") }
-                    Button(
-                        onClick = { /* filtrar */ },
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) { Icon(Icons.Default.FilterList, contentDescription = "Filtrar") }
                 }
 
-                // Categoria atual
-                selectedCategory?.let { cat ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { /* trocar categoria */ }
-                            .padding(vertical = 8.dp, horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(cat, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
-                        Spacer(Modifier.weight(1f))
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onBackground)
-                    }
-                    Divider(color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f))
-                }
+                // Seletor de categoria
+                CategorySelector(
+                    categories = categories,
+                    selectedCategory = selectedCategory,
+                    onSelect = { selectedCategory = it }
+                )
 
                 Spacer(Modifier.height(12.dp))
 
@@ -250,6 +234,47 @@ fun HomeScreen(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategorySelector(
+    categories: List<String>,
+    selectedCategory: String?,
+    onSelect: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = selectedCategory.orEmpty(),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Categoria") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            categories.forEach { cat ->
+                DropdownMenuItem(
+                    text = { Text(cat) },
+                    onClick = {
+                        onSelect(cat)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+    Divider(color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f))
 }
 
 @Composable
