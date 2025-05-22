@@ -1,5 +1,6 @@
 package br.edu.puc.superid.ui
 
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -90,7 +91,8 @@ fun RegisterScreen(navController: NavController) {
                         mostrarDialogo = true
                     },
                     style = LocalTextStyle.current.copy(
-                        textDecoration = TextDecoration.Underline)
+                        textDecoration = TextDecoration.Underline
+                    )
                 )
             }
         }
@@ -99,56 +101,68 @@ fun RegisterScreen(navController: NavController) {
 
         Button(
             onClick = {
-                if (email.isNotBlank() && senha.isNotBlank() && nome.isNotBlank()) {
-                    FirebaseAuth.getInstance()
-                        .createUserWithEmailAndPassword(email, senha)
-                        .addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                val user = FirebaseAuth.getInstance().currentUser
-                                user?.sendEmailVerification()
-                                    ?.addOnCompleteListener { verificationTask ->
-                                        if (verificationTask.isSuccessful) {
-                                            val uid = user.uid
-                                            val db = Firebase.firestore
-
-                                            // Obter IMEI (com tratamento)
-                                            /*val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-                                            val imei = try {
-                                                telephonyManager.imei ?: "IMEI_NAO_DISPONIVEL"
-                                            } catch (e: SecurityException) {
-                                                "PERMISSAO_NAO_CONCEDIDA"
-                                            }
-                                            */
-
-                                            val hashedPassword = hashPassword(senha)
-
-                                            val usuario = mapOf(
-                                                "uid" to uid,
-                                                "nome" to nome,
-                                                "email" to email,
-                                                "senha" to hashedPassword
-                                                //"imei" to imei
-                                            )
-
-                                            db.collection("usuarios").document(uid).set(usuario)
-                                                .addOnSuccessListener {
-                                                    Toast.makeText(context, "Cadastro realizado! Verifique seu e-mail.", Toast.LENGTH_LONG).show()
-                                                    navController.navigate("login")
-                                                }
-                                                .addOnFailureListener {
-                                                    Toast.makeText(context, "Erro ao salvar dados: ${it.message}", Toast.LENGTH_LONG).show()
-                                                }
-                                        } else {
-                                            Toast.makeText(context, "Erro ao enviar e-mail de verificação", Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                            } else {
-                                Toast.makeText(context, "Erro ao criar usuário: ${task.exception?.message}", Toast.LENGTH_LONG).show()
-                            }
-                        }
-                } else {
+                if (nome.isBlank() || email.isBlank() || senha.isBlank()) {
                     Toast.makeText(context, "Preencha todos os campos!", Toast.LENGTH_SHORT).show()
+                    return@Button
                 }
+
+                FirebaseAuth.getInstance()
+                    .createUserWithEmailAndPassword(email, senha)
+                    .addOnCompleteListener { task ->
+                        if (!task.isSuccessful) {
+                            Toast.makeText(context,
+                                "Erro ao criar usuário: ${task.exception?.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return@addOnCompleteListener
+                        }
+
+                        val user = FirebaseAuth.getInstance().currentUser!!
+                        user.sendEmailVerification().addOnCompleteListener { verifTask ->
+                            if (!verifTask.isSuccessful) {
+                                Toast.makeText(context,
+                                    "Erro ao enviar e-mail de verificação",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                return@addOnCompleteListener
+                            }
+
+                            // Aqui pegamos o Android ID
+                            val androidId = Settings.Secure.getString(
+                                context.contentResolver,
+                                Settings.Secure.ANDROID_ID
+                            )
+
+                            val uid = user.uid
+                            val db = Firebase.firestore
+                            val hashedPassword = hashPassword(senha)
+
+                            val usuario = mapOf(
+                                "uid" to uid,
+                                "nome" to nome,
+                                "email" to email,
+                                "senha" to hashedPassword,
+                                "androidId" to androidId
+                            )
+
+                            db.collection("usuarios").document(uid).set(usuario)
+                                .addOnSuccessListener {
+                                    Toast.makeText(
+                                        context,
+                                        "Cadastro realizado! Verifique seu e-mail.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    navController.navigate("login")
+                                }
+                                .addOnFailureListener {
+                                    Toast.makeText(
+                                        context,
+                                        "Erro ao salvar no Firestore: ${it.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                        }
+                    }
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = aceitarTermos
@@ -158,31 +172,27 @@ fun RegisterScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TextButton(
-            onClick = {
-                navController.navigate("login")
-            }
-        ) {
-            Text(text = "Já possuo conta",
+        TextButton(onClick = { navController.navigate("login") }) {
+            Text(
+                text = "Já possuo conta",
                 color = MaterialTheme.colorScheme.primary,
-                    style = LocalTextStyle.current.copy(
-                    textDecoration = TextDecoration.Underline)
+                style = LocalTextStyle.current.copy(
+                    textDecoration = TextDecoration.Underline
+                )
             )
         }
     }
 
-    // Dialogo dos Termos de Uso com Scroll
+    // Diálogo de Termos de Uso com Scroll
     if (mostrarDialogo) {
         AlertDialog(
             onDismissRequest = { mostrarDialogo = false },
-            title = {
-                Text(text = "Termos de Uso")
-            },
+            title = { Text("Termos de Uso") },
             text = {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(300.dp) // Limita a altura para a rolagem
+                        .height(300.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
                     Text(
@@ -191,7 +201,7 @@ fun RegisterScreen(navController: NavController) {
                         Ao utilizar este aplicativo, você automaticamente concorda com absolutamente tudo que está escrito aqui, mesmo sem ter lido nada (porque ninguém lê, né?). Qualquer choro posterior será ignorado com sucesso.
 
                         2️⃣ Coleta de Dados (ou quase isso)
-                        A gente coleta tudo. Seu nome, seu e-mail, sua senha, seu IMEI (porque a gente precisa parecer sério), seu histórico de navegação, seus sonhos, suas frustrações e até aquela busca estranha que você fez às 3h da manhã. E sim, a gente julga todas elas.
+                        A gente coleta tudo. Seu nome, seu e-mail, sua senha, seu Android ID (porque a gente precisa parecer sério, nem sei se isso existe), seu histórico de navegação, seus sonhos, suas frustrações e até aquela busca estranha que você fez às 3h da manhã. E sim, a gente julga todas elas.
 
                         3️⃣ Uso das Informações
                         Usaremos seus dados para coisas super importantes, como guardar suas senhas… e, sei lá, talvez vender para a Associação dos Illuminati. Mas fique tranquilo, só em casos extremos (ou quando estiver precisando pagar o boleto do mês).
@@ -212,9 +222,7 @@ fun RegisterScreen(navController: NavController) {
                 }
             },
             confirmButton = {
-                TextButton(
-                    onClick = { mostrarDialogo = false }
-                ) {
+                TextButton(onClick = { mostrarDialogo = false }) {
                     Text("Fechar")
                 }
             }
@@ -223,6 +231,7 @@ fun RegisterScreen(navController: NavController) {
 }
 
 fun hashPassword(senha: String): String {
-    val bytes = MessageDigest.getInstance("SHA-256").digest(senha.toByteArray())
+    val bytes = MessageDigest.getInstance("SHA-256")
+        .digest(senha.toByteArray())
     return bytes.joinToString("") { "%02x".format(it) }
 }

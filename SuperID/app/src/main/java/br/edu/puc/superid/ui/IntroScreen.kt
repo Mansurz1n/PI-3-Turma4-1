@@ -41,5 +41,12 @@ fun IntroScreen(navController: NavController) {
         ) {
             Text("Criar Conta", fontSize = 18.sp)
         }
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = { navController.navigate("tutorial") },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Tutorial")
+        }
     }
 }
