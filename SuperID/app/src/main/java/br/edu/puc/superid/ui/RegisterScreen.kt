@@ -2,6 +2,7 @@ package br.edu.puc.superid.ui
 
 import android.provider.Settings
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -11,16 +12,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import br.edu.puc.superid.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import java.security.MessageDigest
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterScreen(navController: NavController) {
     var nome by remember { mutableStateOf("") }
@@ -30,17 +35,29 @@ fun RegisterScreen(navController: NavController) {
     var mostrarDialogo by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
+    val db = Firebase.firestore
 
     Column(
-        modifier = Modifier
+        Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Logo no topo
+        Image(
+            painter = painterResource(id = R.drawable.logo),
+            contentDescription = "Logo SuperID",
+            modifier = Modifier
+                .size(150.dp)
+                .padding(bottom = 24.dp)
+        )
+
         Text(
-            text = "Cadastro no SuperID",
+            "Cadastro no SuperID!",
             style = MaterialTheme.typography.headlineSmall.copy(fontSize = 26.sp),
+            color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
@@ -48,56 +65,80 @@ fun RegisterScreen(navController: NavController) {
             value = nome,
             onValueChange = { nome = it },
             label = { Text("Nome") },
-            modifier = Modifier.fillMaxWidth()
+            singleLine = true,
+            textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface),
+            colors = TextFieldDefaults.outlinedTextFieldColors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                containerColor = MaterialTheme.colorScheme.surface,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
             label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
+            singleLine = true,
+            textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface),
+            colors = TextFieldDefaults.outlinedTextFieldColors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                containerColor = MaterialTheme.colorScheme.surface,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = senha,
             onValueChange = { senha = it },
             label = { Text("Senha") },
+            singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
+            textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface),
+            colors = TextFieldDefaults.outlinedTextFieldColors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                containerColor = MaterialTheme.colorScheme.surface,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.padding(vertical = 16.dp)
         ) {
             Checkbox(
                 checked = aceitarTermos,
-                onCheckedChange = { aceitarTermos = it }
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "Li e aceito os ")
-                Text(
-                    text = "Termos de Uso",
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable {
-                        mostrarDialogo = true
-                    },
-                    style = LocalTextStyle.current.copy(
-                        textDecoration = TextDecoration.Underline
-                    )
+                onCheckedChange = { aceitarTermos = it },
+                colors = CheckboxDefaults.colors(
+                    checkedColor = MaterialTheme.colorScheme.primary
                 )
-            }
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("Li e aceito os ")
+            Text(
+                "Termos de Uso",
+                color = MaterialTheme.colorScheme.primary,
+                textDecoration = TextDecoration.Underline,
+                modifier = Modifier.clickable { mostrarDialogo = true }
+            )
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
 
         Button(
             onClick = {
@@ -105,92 +146,68 @@ fun RegisterScreen(navController: NavController) {
                     Toast.makeText(context, "Preencha todos os campos!", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
-
-                FirebaseAuth.getInstance()
-                    .createUserWithEmailAndPassword(email, senha)
+                auth.createUserWithEmailAndPassword(email, senha)
                     .addOnCompleteListener { task ->
-                        if (!task.isSuccessful) {
-                            Toast.makeText(context,
-                                "Erro ao criar usuário: ${task.exception?.message}",
-                                Toast.LENGTH_LONG
-                            ).show()
-                            return@addOnCompleteListener
-                        }
-
-                        val user = FirebaseAuth.getInstance().currentUser!!
-                        user.sendEmailVerification().addOnCompleteListener { verifTask ->
-                            if (!verifTask.isSuccessful) {
-                                Toast.makeText(context,
-                                    "Erro ao enviar e-mail de verificação",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                return@addOnCompleteListener
-                            }
-
-                            // Aqui pegamos o Android ID
+                        if (task.isSuccessful) {
+                            val user = auth.currentUser!!
+                            user.sendEmailVerification()
                             val androidId = Settings.Secure.getString(
                                 context.contentResolver,
                                 Settings.Secure.ANDROID_ID
                             )
-
-                            val uid = user.uid
-                            val db = Firebase.firestore
-                            val hashedPassword = hashPassword(senha)
-
-                            val usuario = mapOf(
-                                "uid" to uid,
-                                "nome" to nome,
-                                "email" to email,
-                                "senha" to hashedPassword,
-                                "androidId" to androidId
-                            )
-
-                            db.collection("usuarios").document(uid).set(usuario)
-                                .addOnSuccessListener {
-                                    Toast.makeText(
-                                        context,
-                                        "Cadastro realizado! Verifique seu e-mail.",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    navController.navigate("login")
-                                }
-                                .addOnFailureListener {
-                                    Toast.makeText(
-                                        context,
-                                        "Erro ao salvar no Firestore: ${it.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
+                            val hashed = hashPassword(senha)
+                            db.collection("usuarios").document(user.uid).set(
+                                mapOf(
+                                    "uid" to user.uid,
+                                    "nome" to nome,
+                                    "email" to email,
+                                    "senha" to hashed,
+                                    "androidId" to androidId
+                                )
+                            ).addOnSuccessListener {
+                                Toast.makeText(context, "Cadastro realizado!", Toast.LENGTH_LONG).show()
+                                navController.navigate("login")
+                            }
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "Erro: ${task.exception?.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
             },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = aceitarTermos
+            enabled = aceitarTermos,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
         ) {
             Text("Cadastrar")
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
-        TextButton(onClick = { navController.navigate("login") }) {
-            Text(
-                text = "Já possuo conta",
-                color = MaterialTheme.colorScheme.primary,
-                style = LocalTextStyle.current.copy(
-                    textDecoration = TextDecoration.Underline
-                )
+        TextButton(
+            onClick = { navController.navigate("login") },
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = MaterialTheme.colorScheme.primary
             )
+        ) {
+            Text("Já possuo conta", textDecoration = TextDecoration.Underline)
         }
     }
 
-    // Diálogo de Termos de Uso com Scroll
     if (mostrarDialogo) {
         AlertDialog(
             onDismissRequest = { mostrarDialogo = false },
             title = { Text("Termos de Uso") },
             text = {
                 Column(
-                    modifier = Modifier
+                    Modifier
                         .fillMaxWidth()
                         .height(300.dp)
                         .verticalScroll(rememberScrollState())
@@ -230,8 +247,8 @@ fun RegisterScreen(navController: NavController) {
     }
 }
 
-fun hashPassword(senha: String): String {
-    val bytes = MessageDigest.getInstance("SHA-256")
-        .digest(senha.toByteArray())
+// função de hashing no mesmo arquivo
+private fun hashPassword(senha: String): String {
+    val bytes = MessageDigest.getInstance("SHA-256").digest(senha.toByteArray())
     return bytes.joinToString("") { "%02x".format(it) }
 }
