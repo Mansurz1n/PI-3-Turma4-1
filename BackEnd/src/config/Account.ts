@@ -1,11 +1,12 @@
 import {Request, response, Response} from "express";
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, query, where, doc } from 'firebase/firestore/lite';
-import * as QRCode from 'qrcode';
-import * as adm from 'firebase-admin';
 import * as functions from 'firebase-functions' 
+import * as adm from 'firebase-admin';
+import * as QRCode from 'qrcode';
 import { error } from "console";
-import { v4 as uuidv4, v4 } from 'uuid';
+import { v4 as uuidv4} from 'uuid';
+
 
 
 const firebaseConfig = {
@@ -23,12 +24,13 @@ const firebaseConfig = {
     adm.initializeApp(); 
     const app  = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const firestore = adm.firestore();
 
     
     
     export async function InfoAdd(email:string) {
         const colecao =  collection(db, 'usuarios');
-        const q = query(colecao, where("email","==","gb.mansur@gmail.com"));
+        const q = query(colecao, where("email","==",email));
         //TODO: Trocar o meu email pela variavel
         const aaaa = await getDocs(colecao);//todos
         const aaaa2 = await getDocs(q)//especififo
@@ -54,25 +56,34 @@ const firebaseConfig = {
             }
     }
     }
-    export async function performAuth(res:Response, req:Request) {
-        const requestData = req.body
+    export async function performAuth(req:Request, res:Response) {
+        const requestData = req.get('APIKey')
         const apiKey = 'API' 
-        const validAPIKey =  functions.config().api.key//firebase functions:config:set api.key= "A chave q a gnt for fazer"
+        //const validAPIKey =  functions.config().api.key//firebase functions:config:set api.key= "A chave q a gnt for fazer"
         if(requestData !== apiKey){
-            res.status(401).send('APIKey invalida')
+            
+            res.status(404).send('APIKey invalida')
             return
         }
         try{
-            const loginToken = "TokenAleatorio" //pode ser um uuidv4()
-            const logintokenVdd = uuidv4()
-            const dataAtual =  adm.firestore.Timestamp.now();
-            await adm.firestore().collection('logins').doc(logintokenVdd).set({
-                    APIKey: requestData.APIKey,
-                    dataEHorario:dataAtual,
-                    loginToken:logintokenVdd
-                });
 
-            const qrcode = await QRCode.toDataURL(logintokenVdd, {type:'image/png'})
+            const logintokenVdd = uuidv4()
+            console.dir(logintokenVdd)
+
+            const qrcode = await QRCode.toDataURL(logintokenVdd)
+
+
+            const dataAtual =  adm.firestore.FieldValue.serverTimestamp();
+            console.dir(dataAtual)
+            const a = await firestore.collection('logins').doc(logintokenVdd).set({
+                    APIKey: requestData,
+                    loginToken:logintokenVdd,
+                    dataEHorario:dataAtual,
+                    tentativas:3
+                });
+            console.dir('Data base OK')
+            console.log(a)
+            
             
 
             const responseData = {
@@ -81,15 +92,81 @@ const firebaseConfig = {
             }
 
             res.status(200).json(responseData)
-
+            return
 
 
         }catch(err){
             console.log(error);
-            response.status(500).send('Erro')
+            response.status(500).json({error : 'Erro '})
         }
 
     }
+      
+
+
+        export async function getLoginStatus(res:Response, req:Request) {
+            const { loginToken } = req.body
+
+
+            if (!loginToken){
+                res.status(400).json({error : 'Token faltando'})
+                return
+            }
+            try{
+                const tokenDoc = await adm.firestore().collection('loginTokens').doc(loginToken).get();
+
+
+                if(!tokenDoc.exists){
+                    res.status(404).json({error:'Token Não encontrado'})
+
+                }
+
+                const data = tokenDoc.data()!
+
+                const now  = adm .firestore.Timestamp.now();
+                
+                
+                const secs = now.seconds - data.dataEHorario.seconds 
+
+
+                if(secs > 60 || data.tentativas<=0){
+                    await  tokenDoc.ref.delete()
+                    res.status(410).json({error: 'Token expirado.'})
+                    performAuth
+                }
+                
+
+
+                await tokenDoc.ref.update({tentativas:adm.firestore.FieldValue.increment(-1)})
+
+
+                if (data.userId){
+                    const user = await adm.auth().getUser(data.userId)
+                    res.status(200).json({
+                        user: {
+                            uid:user.uid,
+                            email:user.email
+                        }
+                    })
+                    return
+                }
+                res.status(200).json({
+                    tentativas:data.tentativas - 1
+                })
+
+
+
+            }catch(error){
+                console.dir('Erro' + error)
+                res.status(500).json({error : 'Erro '})
+            }
+
+
+
+
+            
+        }
+
 
 
 
