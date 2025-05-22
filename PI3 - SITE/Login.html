@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autenticação</title>
+  <link rel="stylesheet" href="StyleLogin.css">
+  <link rel="stylesheet" href="fontawesome-free-6.7.2-web/css/all.css">
+</head>
+<body>
+  <div class="container">
+    <div class="left-side">
+      <h1>Bem vindo ao SuperID</h1>
+      <p>Site desenvolvido para o teste do SuperID</p>
+    </div>
+    <div class="right-side">
+      <form class="login-form">
+        <h1>Autenticação</h1>
+        
+        <div class="input-group">
+          <i class="fas fa-user"></i>
+          <input type="text" placeholder="Email">
+        </div>
+        
+        <div class="input-group">
+          <i class="fas fa-lock"></i>
+          <input type="password" placeholder="Senha">
+        </div>
+        
+        <div class="options">
+          <label><input type="checkbox"> Lembrar a senha</label>
+          <a  href="#">Esqueceu a senha?</a>
+        </div>
+        <button type="submit" onclick="performLogin()">Entrar</button>
+        <p id="Entrar">Entrar com</p>
+        <div class="icons">
+          <a href="#" id="facebook"><img src="imagens/facebook.png" alt="Clickable Image"></a>
+          <a href="#" onclick="performAuth()"><img src="imagens/google.png" alt="Clickable Image"></a>
+          <a href="#" id="google"><img src="imagens/google.png" alt="Clickable Image"></a>
+
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
