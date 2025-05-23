@@ -1,17 +1,7 @@
 import express from "express";
 import cors from "cors";
 import {Router} from "express";
-import { InfoAdd, performAuth} from "./config/Account";
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore/lite';
-import Firebase from "firebase";
-
-
-
-
-
-
-
+import {performAuth} from "./config/Account";
 
 
 
@@ -19,8 +9,7 @@ const port = 3000;
 const server = express();
 const routes = Router();
 
-
-
+//firebase deploy --only functions
 
 
 

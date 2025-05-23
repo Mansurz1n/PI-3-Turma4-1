@@ -1,12 +1,11 @@
 import {Request, response, Response} from "express";
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, query, where, doc } from 'firebase/firestore/lite';
 import * as functions from 'firebase-functions' 
-import * as adm from 'firebase-admin';
+import * as admin from 'firebase-admin';
 import * as QRCode from 'qrcode';
 import { error } from "console";
 import { v4 as uuidv4} from 'uuid';
-
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore, collection, where, query, getDocs } = require('firebase-admin/firestore');
 
 
 const firebaseConfig = {
@@ -21,14 +20,14 @@ const firebaseConfig = {
 
     
 
-    adm.initializeApp(); 
-    const app  = initializeApp(firebaseConfig);
+    
+    const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const firestore = adm.firestore();
+    
 
     
     
-    export async function InfoAdd(email:string) {
+    /*export async function InfoAdd(email:string) {
         const colecao =  collection(db, 'usuarios');
         const q = query(colecao, where("email","==",email));
         //TODO: Trocar o meu email pela variavel
@@ -42,13 +41,13 @@ const firebaseConfig = {
        else{
         console.log("Conta Criada:", result2)
        }
-    };
+    };*/
 
     export async function Login(res:Response,req:Request){
         var email = req.get('email')
         var token = req.get('token')
         if(email && token){
-            var result = InfoAdd(email)
+            var result =email
             if(!result){
                 res.send('Conta não criada')
             }else{
@@ -57,8 +56,10 @@ const firebaseConfig = {
     }
     }
     export async function performAuth(req:Request, res:Response) {
-        const requestData = req.get('APIKey')
+        const requestData = req.headers['apikey'] 
         const apiKey = 'API' 
+        console.dir(requestData)
+        console.dir(admin.initializeApp)
         //const validAPIKey =  functions.config().api.key//firebase functions:config:set api.key= "A chave q a gnt for fazer"
         if(requestData !== apiKey){
             
@@ -66,23 +67,23 @@ const firebaseConfig = {
             return
         }
         try{
+            console.log('1. Gerando token...');
+            const logintokenVdd = uuidv4();
 
-            const logintokenVdd = uuidv4()
-            console.dir(logintokenVdd)
+            console.log('2. Gerando QRCode...');
+            const qrcode = await QRCode.toDataURL(logintokenVdd);
 
-            const qrcode = await QRCode.toDataURL(logintokenVdd)
+            console.log('3. Gerando timestamp...');
+            const dataAtual = admin.firestore.Timestamp.now().toDate.toString;
 
-
-            const dataAtual =  adm.firestore.FieldValue.serverTimestamp();
-            console.dir(dataAtual)
-            const a = await firestore.collection('logins').doc(logintokenVdd).set({
+            console.log('4. Gravando no Firestore...');
+            await admin.firestore().collection('logins').doc(logintokenVdd).set({
                     APIKey: requestData,
                     loginToken:logintokenVdd,
                     dataEHorario:dataAtual,
                     tentativas:3
                 });
             console.dir('Data base OK')
-            console.log(a)
             
             
 
@@ -96,7 +97,7 @@ const firebaseConfig = {
 
 
         }catch(err){
-            console.log(error);
+            console.dir(error);
             response.status(500).json({error : 'Erro '})
         }
 
@@ -113,7 +114,7 @@ const firebaseConfig = {
                 return
             }
             try{
-                const tokenDoc = await adm.firestore().collection('loginTokens').doc(loginToken).get();
+                const tokenDoc = await admin.firestore().collection('loginTokens').doc(loginToken).get();
 
 
                 if(!tokenDoc.exists){
@@ -123,7 +124,7 @@ const firebaseConfig = {
 
                 const data = tokenDoc.data()!
 
-                const now  = adm .firestore.Timestamp.now();
+                const now  = admin.firestore.Timestamp.now();
                 
                 
                 const secs = now.seconds - data.dataEHorario.seconds 
@@ -137,11 +138,11 @@ const firebaseConfig = {
                 
 
 
-                await tokenDoc.ref.update({tentativas:adm.firestore.FieldValue.increment(-1)})
+                await tokenDoc.ref.update({tentativas:admin.firestore.FieldValue.increment(-1)})
 
 
                 if (data.userId){
-                    const user = await adm.auth().getUser(data.userId)
+                    const user = await admin.auth().getUser(data.userId)
                     res.status(200).json({
                         user: {
                             uid:user.uid,
@@ -156,8 +157,8 @@ const firebaseConfig = {
 
 
 
-            }catch(error){
-                console.dir('Erro' + error)
+            }catch(err){
+                console.dir('Erro' + err)
                 res.status(500).json({error : 'Erro '})
             }
 
@@ -166,9 +167,6 @@ const firebaseConfig = {
 
             
         }
-
-
-
 
 
     
