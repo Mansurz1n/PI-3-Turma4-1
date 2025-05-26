@@ -30,7 +30,7 @@ export const performAuth = onCall(async (request) => {
     const qrcode = await QRCode.toDataURL(loginToken, {type: "image/png"});
 
     // 4. Salvamento no Firestore
-    await admin.firestore().collection("logins").doc(loginToken).set({
+    await admin.firestore().collection("loginTokens").doc(loginToken).set({
       API: request.data.APIkey,
       DataEhorario: dataAtual,
       logintoken: loginToken,
@@ -54,3 +54,57 @@ export const performAuth = onCall(async (request) => {
 });
 
 
+
+
+export const getLoginStatus = onCall (async (request) =>{
+  if(!request.data.loginToken){
+    throw new HttpsError(
+        "failed-precondition",
+        "Parâmetro loginToken Obrigatorio"
+      );
+  }
+  const loginToken = request.data.loginToken
+  const tokenDoc =
+  await admin.firestore().collection('loginTokens').doc(loginToken).get();
+
+  if(!tokenDoc.exists){
+     throw new HttpsError(
+        "permission-denied",
+        "Login Token invalida"
+      );
+  }
+  const data = tokenDoc.data();
+
+  if(!data){
+     throw new HttpsError(
+        "failed-precondition",
+        "Login token com falta de data"
+      );
+  }
+
+  const now = admin.firestore.Timestamp.now();
+
+  const secs = now.seconds - data.DataEhorario.seconds
+  if(secs>60 || data.tentativas<=0){
+    await tokenDoc.ref.delete();
+     throw new HttpsError(
+        "aborted",
+        "Acabou o tempo ou o numero de tentativas"
+      );
+  }
+  await tokenDoc.ref.update({
+    tentativas:admin.firestore.FieldValue.increment(-1)
+  })
+
+  if(data.UserId){
+    const user = 
+    await admin.auth().getUser(data.UserId);
+    return {
+      uid:user.uid,
+      email:user.email
+    }
+  }
+
+  return `tentativas: ${data.tentativas -1}`
+
+}); 
