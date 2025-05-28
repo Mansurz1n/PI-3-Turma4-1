@@ -1,5 +1,6 @@
 package br.edu.puc.superid.ui
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -45,6 +46,7 @@ fun HomeScreen(
 
     // Estado para confirmação de exclusão
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showDeleteCategoryError by remember { mutableStateOf(false) }
 
     // Carrega nome do usuário do Firestore
     LaunchedEffect(uid) {
@@ -56,8 +58,12 @@ fun HomeScreen(
             }
     }
 
-    // Carrega as categorias disponíveis para o usuário atual
+    // Carrega as categorias disponíveis para o usuário atual e garante que as categorias padrão existam
     LaunchedEffect(uid) {
+        // Função para garantir que as categorias padrão existam
+        ensureDefaultCategories(uid)
+
+        // Carrega as categorias do usuário
         Firebase.firestore
             .collection("usuarios")
             .document(uid)
@@ -66,7 +72,10 @@ fun HomeScreen(
                 if (err != null || snap == null) return@addSnapshotListener
                 val cats = snap.documents.mapNotNull { it.getString("nome") }
                 categories = cats
-                if (selectedCategory == null && cats.isNotEmpty()) selectedCategory = cats.first()
+                if (selectedCategory == null && cats.isNotEmpty()) {
+                    // Seleciona Sites Web por padrão se disponível
+                    selectedCategory = if (cats.contains("Sites Web")) "Sites Web" else cats.first()
+                }
             }
     }
 
@@ -349,6 +358,22 @@ fun HomeScreen(
                 )
             }
 
+            // Diálogo de erro ao tentar excluir categoria protegida
+            if (showDeleteCategoryError) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteCategoryError = false },
+                    title = { Text("Não é possível excluir") },
+                    text = { Text("A categoria Sites Web é obrigatória e não pode ser excluída.") },
+                    confirmButton = {
+                        Button(
+                            onClick = { showDeleteCategoryError = false }
+                        ) {
+                            Text("OK")
+                        }
+                    }
+                )
+            }
+
             // Painel de configurações
             if (showSettings) {
                 Box(
@@ -402,6 +427,49 @@ fun HomeScreen(
                             )
                         ) { Text("Sair") }
                     }
+                }
+            }
+        }
+    }
+}
+
+// Função para garantir que as categorias padrão existam para o usuário
+private fun ensureDefaultCategories(uid: String) {
+    val db = Firebase.firestore
+    val categoriesRef = db.collection("usuarios").document(uid).collection("categorias")
+
+    // Lista de categorias padrão com seus atributos
+    val defaultCategories = listOf(
+        mapOf("nome" to "Sites Web", "isDefault" to true, "canDelete" to false),
+        mapOf("nome" to "Aplicativos", "isDefault" to true, "canDelete" to true),
+        mapOf("nome" to "Teclados de Acesso Físico", "isDefault" to true, "canDelete" to true)
+    )
+
+    // Verifica quais categorias padrão já existem
+    categoriesRef.get().addOnSuccessListener { snapshot ->
+        val existingCategories = snapshot.documents.mapNotNull { it.getString("nome") }
+
+        // Para cada categoria padrão, verifica se ela já existe
+        defaultCategories.forEach { categoryData ->
+            val categoryName = categoryData["nome"] as String
+            if (!existingCategories.contains(categoryName)) {
+                // Se não existe, cria a categoria padrão
+                categoriesRef.add(categoryData)
+                    .addOnFailureListener { e ->
+                        Log.e("HomeScreen", "Erro ao criar categoria padrão: $categoryName", e)
+                    }
+            } else {
+                // Se existe, apenas garante que os atributos de categoria padrão estejam corretos
+                // Isso é especialmente importante para "Sites Web" que não deve ser excluída
+                if (categoryName == "Sites Web") {
+                    categoriesRef
+                        .whereEqualTo("nome", "Sites Web")
+                        .get()
+                        .addOnSuccessListener { result ->
+                            for (doc in result) {
+                                doc.reference.update("isDefault", true, "canDelete", false)
+                            }
+                        }
                 }
             }
         }
@@ -503,4 +571,12 @@ data class SenhaEntry(
     val servico: String,
     val senha: String,
     val categoria: String = ""
+)
+
+// Modelo de dados para categorias
+data class CategoryData(
+    val id: String = "",
+    val nome: String = "",
+    val isDefault: Boolean = false,
+    val canDelete: Boolean = true
 )
