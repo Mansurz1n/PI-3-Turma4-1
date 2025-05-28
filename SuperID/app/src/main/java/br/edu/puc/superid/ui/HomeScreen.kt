@@ -1,17 +1,14 @@
 package br.edu.puc.superid.ui
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,14 +20,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 
-// Modelo de dados
-
-data class SenhaEntry(
-    val id: String,
-    val servico: String = "",
-    val senha: String = ""
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -40,13 +29,26 @@ fun HomeScreen(
 ) {
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
 
+    // Estados principais da UI
     var showSettings by remember { mutableStateOf(false) }
     var nomeUsuario by remember { mutableStateOf("") }
     var categories by remember { mutableStateOf(listOf<String>()) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var passwordList by remember { mutableStateOf(listOf<SenhaEntry>()) }
 
-    // Carrega nome do usuário
+    // Estados para o diálogo de edição
+    var showEditDialog by remember { mutableStateOf(false) }
+    var selectedPassword by remember { mutableStateOf<SenhaEntry?>(null) }
+    var editServico by remember { mutableStateOf("") }
+    var editSenha by remember { mutableStateOf("") }
+    var editCategoria by remember { mutableStateOf("") }
+    var expandedCategorias by remember { mutableStateOf(false) }
+
+    // Estado para confirmação de exclusão
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showDeleteCategoryError by remember { mutableStateOf(false) }
+
+    // Carrega nome do usuário do Firestore
     LaunchedEffect(uid) {
         Firebase.firestore
             .collection("usuarios")
@@ -56,8 +58,12 @@ fun HomeScreen(
             }
     }
 
-    // Carrega categorias
+    // Carrega as categorias disponíveis para o usuário atual e garante que as categorias padrão existam
     LaunchedEffect(uid) {
+        // Função para garantir que as categorias padrão existam
+        ensureDefaultCategories(uid)
+
+        // Carrega as categorias do usuário
         Firebase.firestore
             .collection("usuarios")
             .document(uid)
@@ -66,11 +72,14 @@ fun HomeScreen(
                 if (err != null || snap == null) return@addSnapshotListener
                 val cats = snap.documents.mapNotNull { it.getString("nome") }
                 categories = cats
-                if (selectedCategory == null && cats.isNotEmpty()) selectedCategory = cats.first()
+                if (selectedCategory == null && cats.isNotEmpty()) {
+                    // Seleciona Sites Web por padrão se disponível
+                    selectedCategory = if (cats.contains("Sites Web")) "Sites Web" else cats.first()
+                }
             }
     }
 
-    // Carrega senhas filtradas
+    // Carrega senhas filtradas pela categoria selecionada
     LaunchedEffect(uid, selectedCategory) {
         if (selectedCategory != null) {
             Firebase.firestore
@@ -84,7 +93,8 @@ fun HomeScreen(
                         SenhaEntry(
                             id = doc.id,
                             servico = doc.getString("servico") ?: "",
-                            senha = doc.getString("senha") ?: ""
+                            senha = doc.getString("senha") ?: "",
+                            categoria = doc.getString("categoria") ?: ""
                         )
                     }
                 }
@@ -98,7 +108,7 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = { Text("SuperID") },
-                colors = TopAppBarDefaults.smallTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary
                 ),
@@ -118,7 +128,7 @@ fun HomeScreen(
                 .padding(innerPadding)
         ) {
             Column {
-                // Botões no topo
+                // Barra de ações com botão Nova
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -132,37 +142,49 @@ fun HomeScreen(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         )
-                    ) { Text("Nova") }
-                    Button(
-                        onClick = { /* editar */ },
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) { Text("Editar") }
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Nova Senha")
+                    }
                 }
 
                 // Seletor de categoria
                 CategorySelector(
                     categories = categories,
                     selectedCategory = selectedCategory,
-                    onSelect = { selectedCategory = it }
+                    onSelect = { category -> selectedCategory = category }
                 )
 
                 Spacer(Modifier.height(12.dp))
 
-                // Lista de senhas
+                // Lista de senhas da categoria selecionada
                 LazyColumn(
                     Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    items(passwordList, key = { it.id }) { entry -> PasswordCard(entry) }
+                    items(passwordList, key = { it.id }) { entry ->
+                        PasswordCard(
+                            entry = entry,
+                            onEdit = {
+                                selectedPassword = entry
+                                editServico = entry.servico
+                                editSenha = entry.senha
+                                editCategoria = entry.categoria
+                                showEditDialog = true
+                            },
+                            onDelete = {
+                                selectedPassword = entry
+                                showDeleteConfirmDialog = true
+                            }
+                        )
+                    }
                 }
 
-                // Ícone QR Code
+                // Botão QR Code para scanear
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -177,7 +199,182 @@ fun HomeScreen(
                 }
             }
 
-            // Configurações
+            // Diálogo de edição de senha
+            if (showEditDialog && selectedPassword != null) {
+                AlertDialog(
+                    onDismissRequest = { showEditDialog = false },
+                    title = { Text("Editar Senha") },
+                    text = {
+                        Column {
+                            // Campo de serviço
+                            OutlinedTextField(
+                                value = editServico,
+                                onValueChange = { editServico = it },
+                                label = { Text("Serviço") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = TextFieldDefaults.outlinedTextFieldColors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                    cursorColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Campo de senha
+                            OutlinedTextField(
+                                value = editSenha,
+                                onValueChange = { editSenha = it },
+                                label = { Text("Senha") },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = TextFieldDefaults.outlinedTextFieldColors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                    cursorColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Menu dropdown para seleção de categoria
+                            ExposedDropdownMenuBox(
+                                expanded = expandedCategorias,
+                                onExpandedChange = { expandedCategorias = it }
+                            ) {
+                                OutlinedTextField(
+                                    value = editCategoria,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Categoria") },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCategorias) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor(),
+                                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                                    )
+                                )
+
+                                ExposedDropdownMenu(
+                                    expanded = expandedCategorias,
+                                    onDismissRequest = { expandedCategorias = false }
+                                ) {
+                                    categories.forEach { categoria ->
+                                        DropdownMenuItem(
+                                            text = { Text(categoria) },
+                                            onClick = {
+                                                editCategoria = categoria
+                                                expandedCategorias = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Row(
+                            horizontalArrangement = Arrangement.End,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            TextButton(onClick = { showEditDialog = false }) {
+                                Text("Cancelar")
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Botão para salvar as alterações
+                            Button(
+                                onClick = {
+                                    selectedPassword?.id?.let { id ->
+                                        // Valida e atualiza os dados no Firestore
+                                        if (editServico.isNotBlank() && editSenha.isNotBlank() && editCategoria.isNotBlank()) {
+                                            val senhaData = hashMapOf(
+                                                "servico" to editServico,
+                                                "senha" to editSenha,
+                                                "categoria" to editCategoria
+                                            )
+
+                                            Firebase.firestore
+                                                .collection("usuarios")
+                                                .document(uid)
+                                                .collection("senhas")
+                                                .document(id)
+                                                .update(senhaData as Map<String, Any>)
+                                                .addOnSuccessListener {
+                                                    showEditDialog = false
+                                                }
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            ) {
+                                Text("Salvar")
+                            }
+                        }
+                    }
+                )
+            }
+
+            // Diálogo de confirmação de exclusão
+            if (showDeleteConfirmDialog && selectedPassword != null) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteConfirmDialog = false },
+                    title = { Text("Excluir senha") },
+                    text = { Text("Tem certeza que deseja excluir a senha de ${selectedPassword?.servico}?") },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                selectedPassword?.id?.let { id ->
+                                    // Remove a senha do Firestore
+                                    Firebase.firestore
+                                        .collection("usuarios")
+                                        .document(uid)
+                                        .collection("senhas")
+                                        .document(id)
+                                        .delete()
+                                        .addOnSuccessListener {
+                                            showDeleteConfirmDialog = false
+                                        }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            )
+                        ) {
+                            Text("Excluir")
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(onClick = { showDeleteConfirmDialog = false }) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
+            }
+
+            // Diálogo de erro ao tentar excluir categoria protegida
+            if (showDeleteCategoryError) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteCategoryError = false },
+                    title = { Text("Não é possível excluir") },
+                    text = { Text("A categoria Sites Web é obrigatória e não pode ser excluída.") },
+                    confirmButton = {
+                        Button(
+                            onClick = { showDeleteCategoryError = false }
+                        ) {
+                            Text("OK")
+                        }
+                    }
+                )
+            }
+
+            // Painel de configurações
             if (showSettings) {
                 Box(
                     Modifier
@@ -236,49 +433,56 @@ fun HomeScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CategorySelector(
-    categories: List<String>,
-    selectedCategory: String?,
-    onSelect: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
+// Função para garantir que as categorias padrão existam para o usuário
+private fun ensureDefaultCategories(uid: String) {
+    val db = Firebase.firestore
+    val categoriesRef = db.collection("usuarios").document(uid).collection("categorias")
 
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded }
-    ) {
-        OutlinedTextField(
-            value = selectedCategory.orEmpty(),
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Categoria") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor()
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            categories.forEach { cat ->
-                DropdownMenuItem(
-                    text = { Text(cat) },
-                    onClick = {
-                        onSelect(cat)
-                        expanded = false
+    // Lista de categorias padrão com seus atributos
+    val defaultCategories = listOf(
+        mapOf("nome" to "Sites Web", "isDefault" to true, "canDelete" to false),
+        mapOf("nome" to "Aplicativos", "isDefault" to true, "canDelete" to true),
+        mapOf("nome" to "Teclados de Acesso Físico", "isDefault" to true, "canDelete" to true)
+    )
+
+    // Verifica quais categorias padrão já existem
+    categoriesRef.get().addOnSuccessListener { snapshot ->
+        val existingCategories = snapshot.documents.mapNotNull { it.getString("nome") }
+
+        // Para cada categoria padrão, verifica se ela já existe
+        defaultCategories.forEach { categoryData ->
+            val categoryName = categoryData["nome"] as String
+            if (!existingCategories.contains(categoryName)) {
+                // Se não existe, cria a categoria padrão
+                categoriesRef.add(categoryData)
+                    .addOnFailureListener { e ->
+                        Log.e("HomeScreen", "Erro ao criar categoria padrão: $categoryName", e)
                     }
-                )
+            } else {
+                // Se existe, apenas garante que os atributos de categoria padrão estejam corretos
+                // Isso é especialmente importante para "Sites Web" que não deve ser excluída
+                if (categoryName == "Sites Web") {
+                    categoriesRef
+                        .whereEqualTo("nome", "Sites Web")
+                        .get()
+                        .addOnSuccessListener { result ->
+                            for (doc in result) {
+                                doc.reference.update("isDefault", true, "canDelete", false)
+                            }
+                        }
+                }
             }
         }
     }
-    Divider(color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f))
 }
 
+// Componente para exibir um cartão de senha na lista
 @Composable
-private fun PasswordCard(entry: SenhaEntry) {
+private fun PasswordCard(
+    entry: SenhaEntry,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
     var visible by remember { mutableStateOf(false) }
     Card(
         Modifier.fillMaxWidth(),
@@ -292,6 +496,7 @@ private fun PasswordCard(entry: SenhaEntry) {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                // Mostra senha ou oculta com asteriscos
                 Text(
                     text = if (visible) entry.senha else "••••••••••",
                     modifier = Modifier.weight(1f),
@@ -305,6 +510,73 @@ private fun PasswordCard(entry: SenhaEntry) {
                     )
                 }
             }
+
+            // Linha de ações para cada cartão
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                IconButton(onClick = onEdit) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Editar",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Excluir",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
         }
     }
 }
+
+// Componente para seleção de categorias
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategorySelector(
+    categories: List<String>,
+    selectedCategory: String?,
+    onSelect: (String) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(categories) { category ->
+            val isSelected = category == selectedCategory
+            FilterChip(
+                selected = isSelected,
+                onClick = { onSelect(category) },
+                label = { Text(category) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
+        }
+    }
+}
+
+// Modelo de dados para os itens de senha
+data class SenhaEntry(
+    val id: String,
+    val servico: String,
+    val senha: String,
+    val categoria: String = ""
+)
+
+// Modelo de dados para categorias
+data class CategoryData(
+    val id: String = "",
+    val nome: String = "",
+    val isDefault: Boolean = false,
+    val canDelete: Boolean = true
+)
