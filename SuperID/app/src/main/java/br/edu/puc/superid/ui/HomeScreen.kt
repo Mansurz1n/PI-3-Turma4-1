@@ -1,5 +1,7 @@
 package br.edu.puc.superid.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -191,7 +194,9 @@ fun HomeScreen(
                         .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    IconButton(onClick = { navController.navigate("scanQRCode") }) {
+                    IconButton(onClick = {
+                        navController.navigate("scanQRCode")
+                    }) {
                         Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR Code",
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onBackground)
