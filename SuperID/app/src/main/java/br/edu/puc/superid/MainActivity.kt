@@ -1,5 +1,6 @@
 package br.edu.puc.superid
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,9 +24,18 @@ import br.edu.puc.superid.ui.theme.SuperIDTheme
 import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // SharedPreferences para controlar o primeiro uso
+        val prefs = getSharedPreferences("superid_prefs", Context.MODE_PRIVATE)
+        val firstRun = prefs.getBoolean("first_run", true)
+        if (firstRun) {
+            // Marca que já não é mais a primeira vez
+            prefs.edit().putBoolean("first_run", false).apply()
+        }
 
         setContent {
             // Estado de tema no nível mais alto
@@ -34,10 +44,12 @@ class MainActivity : ComponentActivity() {
             SuperIDTheme(darkTheme = isDarkTheme) {
                 val navController = rememberNavController()
 
-                // Define rota inicial conforme autenticação
-                val startDestination =
-                    if (FirebaseAuth.getInstance().currentUser != null) "home"
-                    else "intro"
+                // Define rota inicial conforme primeiro uso e autenticação
+                val startDestination = when {
+                    firstRun -> "tutorial"
+                    FirebaseAuth.getInstance().currentUser != null -> "home"
+                    else -> "intro"
+                }
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     NavHost(
@@ -50,9 +62,9 @@ class MainActivity : ComponentActivity() {
                         composable("login")    { LoginScreen(navController) }
                         composable("home")     {
                             HomeScreen(
-                                navController   = navController,
-                                isDarkTheme     = isDarkTheme,
-                                onToggleTheme   = { dark -> isDarkTheme = dark }
+                                navController = navController,
+                                isDarkTheme = isDarkTheme,
+                                onToggleTheme = { dark -> isDarkTheme = dark }
                             )
                         }
                         composable("addPassword") { AddPasswordScreen(navController) }
