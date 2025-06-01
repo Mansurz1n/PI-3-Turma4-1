@@ -8,5 +8,15 @@ button.onclick = function() {
 }
 
 buttonClose.onclick = function() {
+  stopStatusPolling()
     modal.close()
+}
+
+// Function to stop the polling
+function stopStatusPolling() {
+  if (interval) {
+    clearInterval(interval);
+    interval = null; // Reset the interval variable
+    console.log("Polling stopped.");
+  }
 }

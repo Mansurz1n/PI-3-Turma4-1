@@ -22,12 +22,11 @@ const app = initializeApp(firebaseConfig);
 const functions = getFunctions(app);
 
 
-
 async function performAuth() {
   const fn = httpsCallable(functions, "performAuth");
     try {
 
-        const apikey = 'API'
+        const apikey = "Teste do SuperID"
         const result = await fn({ APIkey: apikey });
 
         const { qrcode, token } = result.data;
@@ -74,24 +73,26 @@ async function generateNewQRCode() {
 }
 
 // Função de polling de status
+let interval; 
 function startStatusPolling(a) {
-  const b = httpsCallable(functions,"getLoginStatus");
-  const interval = setInterval(async () => {
+  const b = httpsCallable(functions, "getLoginStatus");
+  
+  interval = setInterval(async () => {
     try {
-      const result = await b({ loginToken:a });
+      const result = await b({ loginToken: a });
       
       if (result.data.status === "completed") {
         clearInterval(interval);
-        elemtId("qrcode").style.display = "none"
+        document.getElementById("qrcode").style.display = "none";
         alert(`Usuário autenticado: ${result.data.user?.email}`);
       }
-      console.log(result)
+      console.log(result);
     } catch (error) {
       clearInterval(interval);
       console.error("Erro na chamada StartStatus/getLoginStatus:", error);
       generateNewQRCode();
     }
-  }, 5000);//5 segundos
+  }, 5000); // 5 segundos
 }
 
 // Event Listener para o botão

@@ -169,7 +169,7 @@ fun CameraAppScreen() {
                     lensFacing = lensFacing,
                     zoomLevel = 0f,
                     imageCaptureUseCase = imageCaptureUseCase,
-                    onQRCodeScanned = { value -> fire(scannedValue) = value },
+                    onQRCodeScanned = { value -> fire(scannedValue) {name->}= value },
                     flash = flashligt,
                     onFlashToggle = {
                         enabled -> flashligt = enabled

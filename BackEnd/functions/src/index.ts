@@ -18,7 +18,7 @@ export const performAuth = onCall(async (request) => {
       );
     }
 
-    if (request.data.APIkey !== "API") {
+    if (request.data.APIkey !== "Teste do SuperID") {
       throw new functions.https.HttpsError(
         "permission-denied",
         "API key inválida"
@@ -39,7 +39,7 @@ export const performAuth = onCall(async (request) => {
       logintoken: loginToken,
       tentativas: 3,
       status: "pending",
-      UserID: ""
+      UserID: "",
     });
 
     // 5. Retorno formatado
@@ -94,9 +94,6 @@ export const getLoginStatus = onCall(async (request) =>{
       "Acabou o tempo ou o numero de tentativas"
     );
   }
-  await tokenDoc.ref.update({
-    tentativas: admin.firestore.FieldValue.increment(-1),
-  });
 
   if (data.UserId) {
     await tokenDoc.ref.update({
@@ -109,8 +106,7 @@ export const getLoginStatus = onCall(async (request) =>{
       email: user.email,
     };
   }
-
-  return `tentativas: ${data.tentativas -1}`;
+  return "";
 });
 
 
