@@ -39,6 +39,7 @@ export const performAuth = onCall(async (request) => {
       logintoken: loginToken,
       tentativas: 3,
       status: "pending",
+      UserID: ""
     });
 
     // 5. Retorno formatado
