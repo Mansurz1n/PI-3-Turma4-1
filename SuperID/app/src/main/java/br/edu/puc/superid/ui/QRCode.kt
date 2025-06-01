@@ -61,9 +61,13 @@ import androidx.navigation.NavController
 import br.edu.puc.superid.R
 import br.edu.puc.superid.ui.scannerConfig.WithPermission
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.firestore.toObject
+import com.google.firebase.ktx.Firebase
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 
@@ -91,30 +95,40 @@ fun CameraAppScreen() {
     var showDialog by remember { mutableStateOf(false) }
     var showScreen1 by remember { mutableStateOf(true) }
 
-    val firestore = remember { FirebaseFirestore.getInstance() }
-    val conta = FirebaseAuth.getInstance().currentUser?: return
+    val firestore =  Firebase.firestore
 
-    /*fun fire(qrcode:String){
-       val qrc = firestore.collection("logins").document(qrcode)
-            qrc.get().addOnSuccessListener { document ->
+    fun fire(qrcode:String, callback:(String) ->Unit){
+        val qrc = firestore.collection("logins").document(qrcode)
+            .get()
+            .addOnSuccessListener {
+                document ->
                 if(document.data != null) {
                     val api = document.data!!.get("API")
+                    val name = api.toString()
                     showScreen1 = false
-                    return@addOnSuccessListener api
+                    callback(name)
                 }
             }.addOnFailureListener {
-                    return@addOnFailureListener
+                    Log.e("Firestore fire","" )
+                callback("")
             }
     }
+    fun oi(document:DocumentSnapshot) {
+
+    }
     fun res(res:String,qrcode:String){
+        val conta = Firebase.auth.currentUser
         val qrC = firestore.collection("logins").document(qrcode)
         if (res == "yes") {
-            val uid = conta.uid
+            val uid = conta?.uid
             qrC.update("UserID", uid)
+                .addOnSuccessListener { Log.d("firestore res","Update feito com sucess") }
+                .addOnFailureListener { Log.e("Firestore  res","Update deu bosta") }
         } else {
             qrC.update(qrcode, FieldValue.increment(-1))
+                .addOnSuccessListener { Log.d("firestore res ","Tentaviva -1") }
         }
-    }*/
+    }
 
 
     Box(
@@ -155,7 +169,7 @@ fun CameraAppScreen() {
                     lensFacing = lensFacing,
                     zoomLevel = 0f,
                     imageCaptureUseCase = imageCaptureUseCase,
-                    onQRCodeScanned = { value -> scannedValue = value },
+                    onQRCodeScanned = { value -> fire(scannedValue) = value },
                     flash = flashligt,
                     onFlashToggle = {
                         enabled -> flashligt = enabled
@@ -250,13 +264,13 @@ fun CameraAppScreen() {
                             fontWeight = FontWeight.Normal
                         )
                         Text(
-                            text = "puc campinas",
+                            text = "",
                             fontSize = 12.sp,
                             color = Color(0xFFB0B0B0),
                             fontWeight = FontWeight.Light
                         )
                         Button(
-                            onClick = { /* Confirm action */ },
+                            onClick = { res("yes","") },
                             colors = ButtonDefaults.buttonColors(Color(0xFFD40000)),
                             modifier = Modifier
                                 .padding(top = 8.dp)
