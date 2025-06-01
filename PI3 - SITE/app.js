@@ -105,3 +105,4 @@ function startStatusPolling(a) {
       });
 
 document.getElementById("generate-btn")?.addEventListener("click", generateNewQRCode);
+

@@ -4,15 +4,17 @@
     padding: 0;
     box-sizing: border-box;
   }
-  
+
   body,html {
     height: 100%;
     font-family: 'Arial', sans-serif;
+    
   }
   
   .container {
     display: flex;
     height: 100vh;
+    
   }
   /* Estilo do lado esquerdo */
   .left-side {
@@ -153,10 +155,34 @@
     transform: scale(90%);
   }
 
+  #authBtn:hover {
+    background-color: darkred;
+  }
+
+  #authBtn:active {
+    transform: scale(90%);
+  }
+
   .icons img {
     width: 35px;
     height: 35px;
     cursor: pointer;
-    ;
   }
   
+
+  #modal {
+    margin: 80px 200px 100px 500px;
+    height: 80vh;
+    width: 80vh;
+    border-radius: 10px;
+    border: none;
+    box-shadow: 0 0 1em rgba(0, 0, 0, 0.600);
+  }
+
+  #modal h1 {
+    margin: 20px;
+  }
+
+  #close-btn {
+    width: 50%;
+  }

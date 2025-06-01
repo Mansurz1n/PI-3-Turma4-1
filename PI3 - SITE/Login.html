@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="fontawesome-free-6.7.2-web/css/all.css">
 </head>
 <body>
-  
+
   <div class="container">
     <div class="left-side">
       <h1>Bem vindo ao SuperID</h1>
@@ -32,19 +32,27 @@
           <label><input type="checkbox"> Lembrar a senha</label>
           <a  href="#">Esqueceu a senha?</a>
         </div>
-        <button type="submit" onclick="performLogin()">Entrar</button>
+        <button type="submit">Entrar</button>
         <p id="Entrar">Entrar com</p>
         <div class="icons">
           <a href="#" id="facebook"><img src="imagens/facebook.png" alt="Clickable Image"></a>
           <a href="#" id="authBtn"><img src="imagens/image.png" alt="Clickable Image"></a>
           <a href="#" id="google"><img src="imagens/google.png" alt="Clickable Image"></a>
         </div>
-        <div class="qrcode" id="qrcode" style="display: none;">
+        <dialog id="modal"> 
+          <h1>Aproxime a câmera</h1>
+          <div class="qrcode" id="qrcode" style="display: none;">
           <img id="qrImg" alt="qrcode vai mostrar aqui">
         </div>
+          <button id="close-btn">Fechar</button>
+        </dialog>
+        
       </form>
     </div>
+  
   </div>
+  
   <script type="module" src="app.js"></script>
+  <script src="modal.js"></script>
 </body>
 </html>
