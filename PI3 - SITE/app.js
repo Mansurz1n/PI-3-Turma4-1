@@ -5,15 +5,14 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAU9K5TQGHKfkGLBHmivR7KeA6qXKMBoF0",
-  authDomain: "qrcodeaula-ead85.firebaseapp.com",
-  projectId: "qrcodeaula-ead85",
-  storageBucket: "qrcodeaula-ead85.firebasestorage.app",
-  messagingSenderId: "314095348103",
-  appId: "1:314095348103:web:ce4fa3be4ce8f5dcde4b22",
-  measurementId: "G-MDV728DNV3"
+  apiKey: "AIzaSyCA4lfnTxq1c-wvhJIvgBjqyWWSNfzHF14",
+  authDomain: "super-id-fb179.firebaseapp.com",
+  projectId: "super-id-fb179",
+  storageBucket: "super-id-fb179.firebasestorage.app",
+  messagingSenderId: "774292125293",
+  appId: "1:774292125293:web:9a873653b7af03814e3164",
+  measurementId: "G-NZ1Y2T4LYK"
 };
-
 
 
 function elemtId(s){ 
@@ -55,7 +54,7 @@ async function performAuth() {
 async function generateNewQRCode() {
   const fn = httpsCallable(functions, "performAuth");
   try {
-    const apikey = 'API'
+    const apikey = 'Teste do SuperID'
     const result = await fn({ APIkey: apikey });
 
     const { qrcode, token } = result.data;
