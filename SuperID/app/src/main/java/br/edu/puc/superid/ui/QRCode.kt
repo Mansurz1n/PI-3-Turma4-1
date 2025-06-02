@@ -125,9 +125,8 @@ private fun CameraContent(navController: NavController) {
         scannedValue?.let { qrCode ->
             val updates = hashMapOf<String, Any>(
                 "UserID" to user.uid,
-                "status" to "completed",
+                "status" to "Completed",
                 "email" to (user.email ?: ""),
-                "displayName" to (user.displayName ?: ""),
             )
 
             firestore.collection("logins").document(qrCode)
@@ -164,6 +163,7 @@ private fun CameraContent(navController: NavController) {
             onQRCodeScanned = { value ->
                 if (value != null && scannedValue == null) {
                     scannedValue = value
+                    partnerName = value
                 }
             },
             flash = flashEnabled,
@@ -175,6 +175,13 @@ private fun CameraContent(navController: NavController) {
                 partnerName = partnerName,
                 onConfirm = { confirmLogin() },
                 onCancel = {
+                    scannedValue?.let {
+                        firestore.collection("logins").document(it)
+                            .update("tentativas",FieldValue.increment(-1)
+                            )
+
+
+                    }
                     showConfirmation = false
                     scannedValue = null
                 }
@@ -200,6 +207,10 @@ private fun CameraContent(navController: NavController) {
         }
     }
 }
+
+
+
+
 
 @Composable
 private fun ConfirmationDialog(

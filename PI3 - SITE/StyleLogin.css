@@ -171,9 +171,10 @@
   
 
   #modal {
-    margin: 80px 200px 100px 500px;
-    height: 80vh;
-    width: 80vh;
+    margin: 250px 600px 300px 800px;
+    align-items: center;
+    height: 40vh;
+    width:  40vh;
     border-radius: 10px;
     border: none;
     box-shadow: 0 0 1em rgba(0, 0, 0, 0.600);

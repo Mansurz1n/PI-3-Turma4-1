@@ -21,38 +21,37 @@ function elemtId(s){
 const app = initializeApp(firebaseConfig);
 const functions = getFunctions(app);
 
+//codigos do modal 
+const button = document.querySelector("#authBtn")
+const modal = document.querySelector("dialog")
+const buttonClose = document.querySelector("#close-btn")
 
-async function performAuth() {
-  const fn = httpsCallable(functions, "performAuth");
-    try {
-
-        const apikey = "Teste do SuperID"
-        const result = await fn({ APIkey: apikey });
-
-        const { qrcode, token } = result.data;
-        elemtId("qrImg").src = qrcode;
-        if(elemtId("qrcode").style.display !== "block"){
-          elemtId("qrcode").style.display = "block"
-        }
-        console.log("Token gerado:", token);
-      } catch (err) {
-        console.error("Erro na chamada performAuth:", err);
-        alert("Falha ao gerar QR: " + err.message);
-      }
+button.onclick = function() {
+  modal.showModal()
+  console.log(modal)
 }
 
-    // 5) Vincula ao clique do botão
+buttonClose.onclick = function() {
+  stopStatusPolling()
+    modal.close()
+}
 
-
-
-
-
-
+// Function to stop the polling
+function stopStatusPolling() {
+  if (interval) {
+    clearInterval(interval);
+    interval = null; // Reset the interval variable
+    console.log("Polling stopped.");
+  }
+}
 
 // Função para gerar QR Code
 async function generateNewQRCode() {
   const fn = httpsCallable(functions, "performAuth");
   try {
+    elemtId("AAA").style.display = "none"
+    document.getElementById("hor").style.display = "none";
+    document.getElementById("uid").style.display = "none";
     const apikey = 'Teste do SuperID'
     const result = await fn({ APIkey: apikey });
 
@@ -81,10 +80,16 @@ function startStatusPolling(a) {
     try {
       const result = await b({ loginToken: a });
       
-      if (result.data.status === "completed") {
+      if (result.data.status === "Completed") {
         clearInterval(interval);
         document.getElementById("qrcode").style.display = "none";
-        alert(`Usuário autenticado: ${result.data.user?.email}`);
+        elemtId("AAA").style.display = "block"
+        document.getElementById("hor").style.display = "block";
+        document.getElementById("uid").style.display = "block";
+        elemtId("hor").textContent = "Data: " + new Date().toLocaleDateString()
+        elemtId("AAA").textContent = "Hora: " + new Date().toLocaleTimeString();
+        elemtId("uid").textContent = "User  ID: " + result.data.UserID; 
+      
       }
       console.log(result);
     } catch (error) {

@@ -17,9 +17,9 @@ import br.edu.puc.superid.ui.AddPasswordScreen
 import br.edu.puc.superid.ui.HomeScreen
 import br.edu.puc.superid.ui.IntroScreen
 import br.edu.puc.superid.ui.LoginScreen
+import br.edu.puc.superid.ui.QRCodeScreen
 import br.edu.puc.superid.ui.RegisterScreen
 import br.edu.puc.superid.ui.TutorialScreen
-import br.edu.puc.superid.ui.a
 import br.edu.puc.superid.ui.theme.SuperIDTheme
 import com.google.firebase.auth.FirebaseAuth
 
@@ -56,7 +56,7 @@ class MainActivity : ComponentActivity() {
                                 onToggleTheme   = { dark -> isDarkTheme = dark }
                             )
                         }
-                        composable("scanQRCode") {a(navController)}
+                        composable("scanQRCode") {QRCodeScreen(navController)}
                         composable("addPassword") { AddPasswordScreen(navController) }
                         composable("tutorial")    { TutorialScreen(navController) }
                     }

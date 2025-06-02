@@ -95,16 +95,8 @@ export const getLoginStatus = onCall(async (request) =>{
     );
   }
 
-  if (data.UserId) {
-    await tokenDoc.ref.update({
-      status: "Completed",
-    });
-    const user =
-    await admin.auth().getUser(data.UserId);
-    return {
-      uid: user.uid,
-      email: user.email,
-    };
+  if (data.UserID) {
+    return data;
   }
   return "";
 });
