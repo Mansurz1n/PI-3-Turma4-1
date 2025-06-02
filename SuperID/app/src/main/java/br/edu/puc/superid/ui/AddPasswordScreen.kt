@@ -2,7 +2,10 @@ package br.edu.puc.superid.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.ExposedDropdownMenuDefaults.TrailingIcon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -19,6 +22,7 @@ import com.google.firebase.ktx.Firebase
 fun AddPasswordScreen(navController: NavController) {
     val context = LocalContext.current
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+    val cryptoManager = remember { CryptoManager() }
 
     // — Estados de categorias —
     var categories by remember { mutableStateOf(listOf<String>()) }
@@ -56,11 +60,28 @@ fun AddPasswordScreen(navController: NavController) {
             .padding(24.dp),
         verticalArrangement = Arrangement.Top
     ) {
-        Text(
-            text = "Nova Senha",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Nova Senha",
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            IconButton(
+                onClick = { showAddCatDialog = true },
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Category,
+                    contentDescription = "Gerenciar Categorias"
+                )
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
 
         // Dropdown de Categoria
         ExposedDropdownMenuBox(
@@ -90,14 +111,6 @@ fun AddPasswordScreen(navController: NavController) {
                         }
                     )
                 }
-                // Opção para criar nova categoria
-                DropdownMenuItem(
-                    text = { Text("+ Nova categoria") },
-                    onClick = {
-                        showAddCatDialog = true
-                        dropdownExpanded = false
-                    }
-                )
             }
         }
 
@@ -145,13 +158,18 @@ fun AddPasswordScreen(navController: NavController) {
                     Toast.makeText(context, "Serviço e senha são obrigatórios", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
+
+                // Criptografa a senha antes de salvar
+                val encryptedPassword = cryptoManager.encrypt(password)
+
                 // Prepara objeto para salvar
                 val entry = mapOf(
                     "categoria" to selectedCategory,
                     "servico"   to serviceName,
                     "login"     to login,
-                    "senha"     to password // sem criptografia por enquanto
+                    "senha"     to encryptedPassword
                 )
+
                 // Salva no Firestore
                 Firebase.firestore
                     .collection("usuarios")
@@ -192,11 +210,16 @@ fun AddPasswordScreen(navController: NavController) {
                             .collection("usuarios")
                             .document(uid)
                             .collection("categorias")
-                            .add(mapOf("nome" to newCategoryName))
+                            .add(mapOf(
+                                "nome" to newCategoryName,
+                                "isDefault" to false,
+                                "canDelete" to true
+                            ))
                             .addOnSuccessListener {
                                 Toast.makeText(context, "Categoria criada!", Toast.LENGTH_SHORT).show()
                                 newCategoryName = ""
                                 showAddCatDialog = false
+                                selectedCategory = newCategoryName
                             }
                             .addOnFailureListener {
                                 Toast.makeText(context, "Erro: ${it.message}", Toast.LENGTH_LONG).show()

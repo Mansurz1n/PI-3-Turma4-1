@@ -1,7 +1,8 @@
 package br.edu.puc.superid.ui
 
-import android.Manifest
-import android.content.pm.PackageManager
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,13 +16,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,7 +40,7 @@ fun HomeScreen(
     // Estados principais da UI
     var showSettings by remember { mutableStateOf(false) }
     var nomeUsuario by remember { mutableStateOf("") }
-    var categories by remember { mutableStateOf(listOf<String>()) }
+    var categories by remember { mutableStateOf(listOf<CategoryData>()) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var passwordList by remember { mutableStateOf(listOf<SenhaEntry>()) }
 
@@ -47,9 +52,18 @@ fun HomeScreen(
     var editCategoria by remember { mutableStateOf("") }
     var expandedCategorias by remember { mutableStateOf(false) }
 
+    // Estados para o gerenciador de categorias
+    var showCategoryManager by remember { mutableStateOf(false) }
+    var categoryToDelete by remember { mutableStateOf<CategoryData?>(null) }
+    var showDeleteCategoryConfirm by remember { mutableStateOf(false) }
+    var newCategoryName by remember { mutableStateOf("") }
+
     // Estado para confirmação de exclusão
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showDeleteCategoryError by remember { mutableStateOf(false) }
+
+    // Inicializa o gerenciador de criptografia
+    val cryptoManager = remember { CryptoManager() }
 
     // Carrega nome do usuário do Firestore
     LaunchedEffect(uid) {
@@ -73,11 +87,19 @@ fun HomeScreen(
             .collection("categorias")
             .addSnapshotListener { snap, err ->
                 if (err != null || snap == null) return@addSnapshotListener
-                val cats = snap.documents.mapNotNull { it.getString("nome") }
+                val cats = snap.documents.map { doc ->
+                    CategoryData(
+                        id = doc.id,
+                        nome = doc.getString("nome") ?: "",
+                        isDefault = doc.getBoolean("isDefault") ?: false,
+                        canDelete = doc.getBoolean("canDelete") ?: true
+                    )
+                }
                 categories = cats
                 if (selectedCategory == null && cats.isNotEmpty()) {
                     // Seleciona Sites Web por padrão se disponível
-                    selectedCategory = if (cats.contains("Sites Web")) "Sites Web" else cats.first()
+                    selectedCategory = cats.find { it.nome == "Sites Web" }?.nome
+                        ?: cats.firstOrNull()?.nome
                 }
             }
     }
@@ -93,10 +115,19 @@ fun HomeScreen(
                 .addSnapshotListener { snap, err ->
                     if (err != null || snap == null) return@addSnapshotListener
                     passwordList = snap.documents.map { doc ->
+                        val encryptedPassword = doc.getString("senha") ?: ""
+                        // Descriptografa a senha para exibição
+                        val decryptedPassword = try {
+                            cryptoManager.decrypt(encryptedPassword)
+                        } catch (e: Exception) {
+                            Log.e("HomeScreen", "Erro ao descriptografar: ${e.message}", e)
+                            encryptedPassword // Em caso de erro, mostra a senha encriptada
+                        }
+
                         SenhaEntry(
                             id = doc.id,
                             servico = doc.getString("servico") ?: "",
-                            senha = doc.getString("senha") ?: "",
+                            senha = decryptedPassword,
                             categoria = doc.getString("categoria") ?: ""
                         )
                     }
@@ -131,16 +162,16 @@ fun HomeScreen(
                 .padding(innerPadding)
         ) {
             Column {
-                // Barra de ações com botão Nova
+                // Barra de ações com botão Nova Senha e Gerenciar Categorias
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.Center
+                        .padding(vertical = 8.dp, horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Button(
                         onClick = { navController.navigate("addPassword") },
-                        modifier = Modifier.padding(horizontal = 4.dp),
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -150,11 +181,24 @@ fun HomeScreen(
                         Spacer(Modifier.width(4.dp))
                         Text("Nova Senha")
                     }
+
+                    Button(
+                        onClick = { showCategoryManager = true },
+                        modifier = Modifier.weight(1f).padding(start = 8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Icon(Icons.Default.Category, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Categorias")
+                    }
                 }
 
                 // Seletor de categoria
                 CategorySelector(
-                    categories = categories,
+                    categories = categories.map { it.nome },
                     selectedCategory = selectedCategory,
                     onSelect = { category -> selectedCategory = category }
                 )
@@ -194,14 +238,169 @@ fun HomeScreen(
                         .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    IconButton(onClick = {
-                        navController.navigate("scanQRCode")
-                    }) {
+                    IconButton(onClick = { navController.navigate("scanQRCode") }) {
                         Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR Code",
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onBackground)
                     }
                 }
+            }
+
+            // Diálogo de gerenciamento de categorias
+            if (showCategoryManager) {
+                AlertDialog(
+                    onDismissRequest = { showCategoryManager = false },
+                    title = { Text("Gerenciar Categorias") },
+                    text = {
+                        Column {
+                            // Campo para adicionar nova categoria
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                OutlinedTextField(
+                                    value = newCategoryName,
+                                    onValueChange = { newCategoryName = it },
+                                    label = { Text("Nova Categoria") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                IconButton(onClick = {
+                                    if (newCategoryName.isNotBlank()) {
+                                        // Adiciona nova categoria
+                                        val newCategory = hashMapOf(
+                                            "nome" to newCategoryName,
+                                            "isDefault" to false,
+                                            "canDelete" to true
+                                        )
+
+                                        Firebase.firestore
+                                            .collection("usuarios")
+                                            .document(uid)
+                                            .collection("categorias")
+                                            .add(newCategory)
+                                            .addOnSuccessListener {
+                                                newCategoryName = ""
+                                            }
+                                    }
+                                }) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = "Adicionar categoria",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.height(16.dp))
+                            Text("Categorias existentes:", style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(8.dp))
+
+                            // Lista de categorias existentes
+                            LazyColumn(
+                                modifier = Modifier.heightIn(max = 250.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(categories) { category ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = category.nome,
+                                            modifier = Modifier.weight(1f)
+                                        )
+
+                                        if (category.canDelete) {
+                                            IconButton(onClick = {
+                                                categoryToDelete = category
+                                                showDeleteCategoryConfirm = true
+                                            }) {
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "Excluir categoria",
+                                                    tint = MaterialTheme.colorScheme.error
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Divider()
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showCategoryManager = false }) {
+                            Text("Fechar")
+                        }
+                    }
+                )
+            }
+
+            // Diálogo de confirmação de exclusão de categoria
+            if (showDeleteCategoryConfirm && categoryToDelete != null) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteCategoryConfirm = false },
+                    title = { Text("Excluir Categoria") },
+                    text = {
+                        Column {
+                            Text("Tem certeza que deseja excluir a categoria '${categoryToDelete?.nome}'?")
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Aviso: Todas as senhas nesta categoria também serão excluídas!",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                categoryToDelete?.let { category ->
+                                    // Primeiro, exclui todas as senhas associadas à categoria
+                                    Firebase.firestore
+                                        .collection("usuarios")
+                                        .document(uid)
+                                        .collection("senhas")
+                                        .whereEqualTo("categoria", category.nome)
+                                        .get()
+                                        .addOnSuccessListener { querySnapshot ->
+                                            for (doc in querySnapshot.documents) {
+                                                doc.reference.delete()
+                                            }
+
+                                            // Depois, exclui a categoria
+                                            Firebase.firestore
+                                                .collection("usuarios")
+                                                .document(uid)
+                                                .collection("categorias")
+                                                .document(category.id)
+                                                .delete()
+                                                .addOnSuccessListener {
+                                                    // Se a categoria excluída era a selecionada,
+                                                    // seleciona outra categoria
+                                                    if (selectedCategory == category.nome) {
+                                                        selectedCategory = categories
+                                                            .filter { it.nome != category.nome }
+                                                            .firstOrNull()?.nome
+                                                    }
+                                                }
+                                        }
+                                }
+                                showDeleteCategoryConfirm = false
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Excluir")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteCategoryConfirm = false }) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
             }
 
             // Diálogo de edição de senha
@@ -265,11 +464,11 @@ fun HomeScreen(
                                     expanded = expandedCategorias,
                                     onDismissRequest = { expandedCategorias = false }
                                 ) {
-                                    categories.forEach { categoria ->
+                                    categories.forEach { category ->
                                         DropdownMenuItem(
-                                            text = { Text(categoria) },
+                                            text = { Text(category.nome) },
                                             onClick = {
-                                                editCategoria = categoria
+                                                editCategoria = category.nome
                                                 expandedCategorias = false
                                             }
                                         )
@@ -295,9 +494,12 @@ fun HomeScreen(
                                     selectedPassword?.id?.let { id ->
                                         // Valida e atualiza os dados no Firestore
                                         if (editServico.isNotBlank() && editSenha.isNotBlank() && editCategoria.isNotBlank()) {
+                                            // Criptografa a senha antes de salvar
+                                            val encryptedPassword = cryptoManager.encrypt(editSenha)
+
                                             val senhaData = hashMapOf(
                                                 "servico" to editServico,
-                                                "senha" to editSenha,
+                                                "senha" to encryptedPassword,
                                                 "categoria" to editCategoria
                                             )
 
@@ -434,6 +636,88 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+// Classe que gerencia a criptografia das senhas
+class CryptoManager {
+    private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+    private val encryptCipher = Cipher.getInstance(TRANSFORMATION)
+    private val decryptCipher = Cipher.getInstance(TRANSFORMATION)
+
+    companion object {
+        private const val KEYSTORE_ALIAS = "SuperIDPasswordKey"
+        private const val TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val IV_LENGTH = 12 // GCM recommended IV length
+    }
+
+    init {
+        initOrCreateKey()
+        initCiphers()
+    }
+
+    private fun initOrCreateKey() {
+        // Verifica se a chave já existe
+        if (!keyStore.containsAlias(KEYSTORE_ALIAS)) {
+            // Se não existe, cria uma nova chave AES
+            val keyGenerator = KeyGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore"
+            )
+            val keyGenParameterSpec = KeyGenParameterSpec.Builder(
+                KEYSTORE_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            ).apply {
+                setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                setKeySize(256)
+                setUserAuthenticationRequired(false)
+            }.build()
+
+            keyGenerator.init(keyGenParameterSpec)
+            keyGenerator.generateKey()
+        }
+    }
+
+    private fun initCiphers() {
+        val key = keyStore.getKey(KEYSTORE_ALIAS, null) as SecretKey
+        encryptCipher.init(Cipher.ENCRYPT_MODE, key)
+    }
+
+    fun encrypt(plainText: String): String {
+        val encryptedBytes = encryptCipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
+        val iv = encryptCipher.iv
+
+        // Reinicializa o cipher para a próxima operação
+        initCiphers()
+
+        // Concatena IV com o texto criptografado e codifica em Base64
+        val combined = ByteArray(iv.size + encryptedBytes.size)
+        System.arraycopy(iv, 0, combined, 0, iv.size)
+        System.arraycopy(encryptedBytes, 0, combined, iv.size, encryptedBytes.size)
+
+        return Base64.encodeToString(combined, Base64.DEFAULT)
+    }
+
+    fun decrypt(encryptedData: String): String {
+        try {
+            val decodedData = Base64.decode(encryptedData, Base64.DEFAULT)
+
+            // Extrai IV e texto criptografado
+            val iv = decodedData.copyOfRange(0, IV_LENGTH)
+            val encryptedBytes = decodedData.copyOfRange(IV_LENGTH, decodedData.size)
+
+            // Configura o cipher para descriptografia
+            val key = keyStore.getKey(KEYSTORE_ALIAS, null) as SecretKey
+            decryptCipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
+
+            val decryptedBytes = decryptCipher.doFinal(encryptedBytes)
+            return String(decryptedBytes, Charsets.UTF_8)
+        } catch (e: Exception) {
+            Log.e("CryptoManager", "Erro na descriptografia: ${e.message}", e)
+            // Se não conseguir descriptografar, pode ser um texto que já estava em plaintext
+            // ou um formato incompatível
+            return encryptedData
         }
     }
 }
