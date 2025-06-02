@@ -27,6 +27,7 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,7 +36,12 @@ fun HomeScreen(
     isDarkTheme: Boolean,
     onToggleTheme: (Boolean) -> Unit
 ) {
+    // Obtém UID; se nulo, não renderiza HomeScreen
     val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+    // SnackbarHostState e CoroutineScope
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     // Estados principais da UI
     var showSettings by remember { mutableStateOf(false) }
@@ -75,12 +81,10 @@ fun HomeScreen(
             }
     }
 
-    // Carrega as categorias disponíveis para o usuário atual e garante que as categorias padrão existam
+    // Carrega categorias e garante categorias padrão
     LaunchedEffect(uid) {
-        // Função para garantir que as categorias padrão existam
         ensureDefaultCategories(uid)
 
-        // Carrega as categorias do usuário
         Firebase.firestore
             .collection("usuarios")
             .document(uid)
@@ -97,7 +101,6 @@ fun HomeScreen(
                 }
                 categories = cats
                 if (selectedCategory == null && cats.isNotEmpty()) {
-                    // Seleciona Sites Web por padrão se disponível
                     selectedCategory = cats.find { it.nome == "Sites Web" }?.nome
                         ?: cats.firstOrNull()?.nome
                 }
@@ -116,14 +119,12 @@ fun HomeScreen(
                     if (err != null || snap == null) return@addSnapshotListener
                     passwordList = snap.documents.map { doc ->
                         val encryptedPassword = doc.getString("senha") ?: ""
-                        // Descriptografa a senha para exibição
                         val decryptedPassword = try {
                             cryptoManager.decrypt(encryptedPassword)
                         } catch (e: Exception) {
                             Log.e("HomeScreen", "Erro ao descriptografar: ${e.message}", e)
-                            encryptedPassword // Em caso de erro, mostra a senha encriptada
+                            encryptedPassword
                         }
-
                         SenhaEntry(
                             id = doc.id,
                             servico = doc.getString("servico") ?: "",
@@ -139,6 +140,7 @@ fun HomeScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("SuperID") },
@@ -148,8 +150,11 @@ fun HomeScreen(
                 ),
                 actions = {
                     IconButton(onClick = { showSettings = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Configurações",
-                            tint = MaterialTheme.colorScheme.onPrimary)
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Configurações",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
                     }
                 }
             )
@@ -162,7 +167,7 @@ fun HomeScreen(
                 .padding(innerPadding)
         ) {
             Column {
-                // Barra de ações com botão Nova Senha e Gerenciar Categorias
+                // ===== Barra de ações: Nova Senha / Categorias =====
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -171,7 +176,9 @@ fun HomeScreen(
                 ) {
                     Button(
                         onClick = { navController.navigate("addPassword") },
-                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -184,7 +191,9 @@ fun HomeScreen(
 
                     Button(
                         onClick = { showCategoryManager = true },
-                        modifier = Modifier.weight(1f).padding(start = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 8.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -196,7 +205,7 @@ fun HomeScreen(
                     }
                 }
 
-                // Seletor de categoria
+                // ===== Seletor de categorias =====
                 CategorySelector(
                     categories = categories.map { it.nome },
                     selectedCategory = selectedCategory,
@@ -205,7 +214,7 @@ fun HomeScreen(
 
                 Spacer(Modifier.height(12.dp))
 
-                // Lista de senhas da categoria selecionada
+                // ===== Lista de senhas =====
                 LazyColumn(
                     Modifier
                         .fillMaxWidth()
@@ -231,29 +240,61 @@ fun HomeScreen(
                     }
                 }
 
-                // Botão QR Code para scanear
+                // ===== Botão QR Code =====
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .padding(vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    IconButton(onClick = { navController.navigate("scanQRCode") }) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR Code",
+                    IconButton(
+                        onClick = {
+                            val currentUser = FirebaseAuth.getInstance().currentUser
+                            if (currentUser != null) {
+                                // Força a recarga do estado do usuário antes de checar isEmailVerified
+                                currentUser.reload()
+                                    .addOnSuccessListener {
+                                        // Depois de recarregar, verifica isEmailVerified atualizado
+                                        if (currentUser.isEmailVerified) {
+                                            navController.navigate("scanQRCode")
+                                        } else {
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar("Verifique seu email")
+                                            }
+                                        }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Log.e("HomeScreen", "Erro ao reload do usuário: ${e.message}", e)
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("Erro ao verificar e-mail")
+                                        }
+                                    }
+                            } else {
+                                // Se usuário não está logado, volta para login
+                                navController.navigate("login") {
+                                    popUpTo("home") { inclusive = true }
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(
+                            Icons.Default.QrCodeScanner,
+                            contentDescription = "Scan QR Code",
                             modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onBackground)
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
                     }
                 }
             }
 
-            // Diálogo de gerenciamento de categorias
+            // ===== Diálogo Gerenciar Categorias =====
             if (showCategoryManager) {
                 AlertDialog(
                     onDismissRequest = { showCategoryManager = false },
                     title = { Text("Gerenciar Categorias") },
                     text = {
                         Column {
-                            // Campo para adicionar nova categoria
+                            // Entrada para nova categoria
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.fillMaxWidth()
@@ -267,13 +308,11 @@ fun HomeScreen(
                                 Spacer(Modifier.width(8.dp))
                                 IconButton(onClick = {
                                     if (newCategoryName.isNotBlank()) {
-                                        // Adiciona nova categoria
                                         val newCategory = hashMapOf(
                                             "nome" to newCategoryName,
                                             "isDefault" to false,
                                             "canDelete" to true
                                         )
-
                                         Firebase.firestore
                                             .collection("usuarios")
                                             .document(uid)
@@ -296,7 +335,6 @@ fun HomeScreen(
                             Text("Categorias existentes:", style = MaterialTheme.typography.titleMedium)
                             Spacer(Modifier.height(8.dp))
 
-                            // Lista de categorias existentes
                             LazyColumn(
                                 modifier = Modifier.heightIn(max = 250.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -310,7 +348,6 @@ fun HomeScreen(
                                             text = category.nome,
                                             modifier = Modifier.weight(1f)
                                         )
-
                                         if (category.canDelete) {
                                             IconButton(onClick = {
                                                 categoryToDelete = category
@@ -337,7 +374,7 @@ fun HomeScreen(
                 )
             }
 
-            // Diálogo de confirmação de exclusão de categoria
+            // ===== Diálogo Confirmar Exclusão de Categoria =====
             if (showDeleteCategoryConfirm && categoryToDelete != null) {
                 AlertDialog(
                     onDismissRequest = { showDeleteCategoryConfirm = false },
@@ -356,7 +393,6 @@ fun HomeScreen(
                         Button(
                             onClick = {
                                 categoryToDelete?.let { category ->
-                                    // Primeiro, exclui todas as senhas associadas à categoria
                                     Firebase.firestore
                                         .collection("usuarios")
                                         .document(uid)
@@ -367,8 +403,6 @@ fun HomeScreen(
                                             for (doc in querySnapshot.documents) {
                                                 doc.reference.delete()
                                             }
-
-                                            // Depois, exclui a categoria
                                             Firebase.firestore
                                                 .collection("usuarios")
                                                 .document(uid)
@@ -376,8 +410,6 @@ fun HomeScreen(
                                                 .document(category.id)
                                                 .delete()
                                                 .addOnSuccessListener {
-                                                    // Se a categoria excluída era a selecionada,
-                                                    // seleciona outra categoria
                                                     if (selectedCategory == category.nome) {
                                                         selectedCategory = categories
                                                             .filter { it.nome != category.nome }
@@ -403,14 +435,13 @@ fun HomeScreen(
                 )
             }
 
-            // Diálogo de edição de senha
+            // ===== Diálogo Editar Senha =====
             if (showEditDialog && selectedPassword != null) {
                 AlertDialog(
                     onDismissRequest = { showEditDialog = false },
                     title = { Text("Editar Senha") },
                     text = {
                         Column {
-                            // Campo de serviço
                             OutlinedTextField(
                                 value = editServico,
                                 onValueChange = { editServico = it },
@@ -422,10 +453,7 @@ fun HomeScreen(
                                     cursorColor = MaterialTheme.colorScheme.primary
                                 )
                             )
-
                             Spacer(modifier = Modifier.height(8.dp))
-
-                            // Campo de senha
                             OutlinedTextField(
                                 value = editSenha,
                                 onValueChange = { editSenha = it },
@@ -437,10 +465,7 @@ fun HomeScreen(
                                     cursorColor = MaterialTheme.colorScheme.primary
                                 )
                             )
-
                             Spacer(modifier = Modifier.height(8.dp))
-
-                            // Menu dropdown para seleção de categoria
                             ExposedDropdownMenuBox(
                                 expanded = expandedCategorias,
                                 onExpandedChange = { expandedCategorias = it }
@@ -450,7 +475,11 @@ fun HomeScreen(
                                     onValueChange = {},
                                     readOnly = true,
                                     label = { Text("Categoria") },
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCategorias) },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(
+                                            expanded = expandedCategorias
+                                        )
+                                    },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .menuAnchor(),
@@ -459,7 +488,6 @@ fun HomeScreen(
                                         focusedLabelColor = MaterialTheme.colorScheme.primary
                                     )
                                 )
-
                                 ExposedDropdownMenu(
                                     expanded = expandedCategorias,
                                     onDismissRequest = { expandedCategorias = false }
@@ -485,24 +513,21 @@ fun HomeScreen(
                             TextButton(onClick = { showEditDialog = false }) {
                                 Text("Cancelar")
                             }
-
                             Spacer(modifier = Modifier.width(8.dp))
-
-                            // Botão para salvar as alterações
                             Button(
                                 onClick = {
                                     selectedPassword?.id?.let { id ->
-                                        // Valida e atualiza os dados no Firestore
-                                        if (editServico.isNotBlank() && editSenha.isNotBlank() && editCategoria.isNotBlank()) {
-                                            // Criptografa a senha antes de salvar
+                                        if (
+                                            editServico.isNotBlank() &&
+                                            editSenha.isNotBlank() &&
+                                            editCategoria.isNotBlank()
+                                        ) {
                                             val encryptedPassword = cryptoManager.encrypt(editSenha)
-
                                             val senhaData = hashMapOf(
                                                 "servico" to editServico,
                                                 "senha" to encryptedPassword,
                                                 "categoria" to editCategoria
                                             )
-
                                             Firebase.firestore
                                                 .collection("usuarios")
                                                 .document(uid)
@@ -527,17 +552,18 @@ fun HomeScreen(
                 )
             }
 
-            // Diálogo de confirmação de exclusão
+            // ===== Diálogo Confirmar Exclusão de Senha =====
             if (showDeleteConfirmDialog && selectedPassword != null) {
                 AlertDialog(
                     onDismissRequest = { showDeleteConfirmDialog = false },
                     title = { Text("Excluir senha") },
-                    text = { Text("Tem certeza que deseja excluir a senha de ${selectedPassword?.servico}?") },
+                    text = {
+                        Text("Tem certeza que deseja excluir a senha de ${selectedPassword?.servico}?")
+                    },
                     confirmButton = {
                         Button(
                             onClick = {
                                 selectedPassword?.id?.let { id ->
-                                    // Remove a senha do Firestore
                                     Firebase.firestore
                                         .collection("usuarios")
                                         .document(uid)
@@ -565,23 +591,21 @@ fun HomeScreen(
                 )
             }
 
-            // Diálogo de erro ao tentar excluir categoria protegida
+            // ===== Diálogo Erro ao Excluir Categoria Protegida =====
             if (showDeleteCategoryError) {
                 AlertDialog(
                     onDismissRequest = { showDeleteCategoryError = false },
                     title = { Text("Não é possível excluir") },
                     text = { Text("A categoria Sites Web é obrigatória e não pode ser excluída.") },
                     confirmButton = {
-                        Button(
-                            onClick = { showDeleteCategoryError = false }
-                        ) {
+                        Button(onClick = { showDeleteCategoryError = false }) {
                             Text("OK")
                         }
                     }
                 )
             }
 
-            // Painel de configurações
+            // ===== Painel de Configurações =====
             if (showSettings) {
                 Box(
                     Modifier
@@ -597,12 +621,17 @@ fun HomeScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Configurações", style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            "Configurações",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Spacer(Modifier.height(12.dp))
                         Text("Nome: $nomeUsuario", color = MaterialTheme.colorScheme.onSurface)
-                        Text("Email: ${FirebaseAuth.getInstance().currentUser?.email}",
-                            color = MaterialTheme.colorScheme.onSurface)
+                        Text(
+                            "Email: ${FirebaseAuth.getInstance().currentUser?.email}",
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Spacer(Modifier.height(16.dp))
                         Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                         Spacer(Modifier.height(16.dp))
@@ -610,8 +639,11 @@ fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Tema escuro", Modifier.weight(1f),
-                                color = MaterialTheme.colorScheme.onSurface)
+                            Text(
+                                "Tema escuro",
+                                Modifier.weight(1f),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                             Switch(
                                 checked = isDarkTheme,
                                 onCheckedChange = onToggleTheme,
@@ -658,9 +690,7 @@ class CryptoManager {
     }
 
     private fun initOrCreateKey() {
-        // Verifica se a chave já existe
         if (!keyStore.containsAlias(KEYSTORE_ALIAS)) {
-            // Se não existe, cria uma nova chave AES
             val keyGenerator = KeyGenerator.getInstance(
                 KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore"
             )
@@ -673,7 +703,6 @@ class CryptoManager {
                 setKeySize(256)
                 setUserAuthenticationRequired(false)
             }.build()
-
             keyGenerator.init(keyGenParameterSpec)
             keyGenerator.generateKey()
         }
@@ -687,37 +716,25 @@ class CryptoManager {
     fun encrypt(plainText: String): String {
         val encryptedBytes = encryptCipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
         val iv = encryptCipher.iv
-
-        // Reinicializa o cipher para a próxima operação
-        initCiphers()
-
-        // Concatena IV com o texto criptografado e codifica em Base64
+        initCiphers() // Reinicializa para próxima operação
         val combined = ByteArray(iv.size + encryptedBytes.size)
         System.arraycopy(iv, 0, combined, 0, iv.size)
         System.arraycopy(encryptedBytes, 0, combined, iv.size, encryptedBytes.size)
-
         return Base64.encodeToString(combined, Base64.DEFAULT)
     }
 
     fun decrypt(encryptedData: String): String {
-        try {
+        return try {
             val decodedData = Base64.decode(encryptedData, Base64.DEFAULT)
-
-            // Extrai IV e texto criptografado
             val iv = decodedData.copyOfRange(0, IV_LENGTH)
             val encryptedBytes = decodedData.copyOfRange(IV_LENGTH, decodedData.size)
-
-            // Configura o cipher para descriptografia
             val key = keyStore.getKey(KEYSTORE_ALIAS, null) as SecretKey
             decryptCipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
-
             val decryptedBytes = decryptCipher.doFinal(encryptedBytes)
-            return String(decryptedBytes, Charsets.UTF_8)
+            String(decryptedBytes, Charsets.UTF_8)
         } catch (e: Exception) {
             Log.e("CryptoManager", "Erro na descriptografia: ${e.message}", e)
-            // Se não conseguir descriptografar, pode ser um texto que já estava em plaintext
-            // ou um formato incompatível
-            return encryptedData
+            encryptedData
         }
     }
 }
@@ -727,29 +744,21 @@ private fun ensureDefaultCategories(uid: String) {
     val db = Firebase.firestore
     val categoriesRef = db.collection("usuarios").document(uid).collection("categorias")
 
-    // Lista de categorias padrão com seus atributos
     val defaultCategories = listOf(
         mapOf("nome" to "Sites Web", "isDefault" to true, "canDelete" to false),
         mapOf("nome" to "Aplicativos", "isDefault" to true, "canDelete" to true),
         mapOf("nome" to "Teclados de Acesso Físico", "isDefault" to true, "canDelete" to true)
     )
 
-    // Verifica quais categorias padrão já existem
     categoriesRef.get().addOnSuccessListener { snapshot ->
         val existingCategories = snapshot.documents.mapNotNull { it.getString("nome") }
-
-        // Para cada categoria padrão, verifica se ela já existe
         defaultCategories.forEach { categoryData ->
             val categoryName = categoryData["nome"] as String
             if (!existingCategories.contains(categoryName)) {
-                // Se não existe, cria a categoria padrão
-                categoriesRef.add(categoryData)
-                    .addOnFailureListener { e ->
-                        Log.e("HomeScreen", "Erro ao criar categoria padrão: $categoryName", e)
-                    }
+                categoriesRef.add(categoryData).addOnFailureListener { e ->
+                    Log.e("HomeScreen", "Erro ao criar categoria padrão: $categoryName", e)
+                }
             } else {
-                // Se existe, apenas garante que os atributos de categoria padrão estejam corretos
-                // Isso é especialmente importante para "Sites Web" que não deve ser excluída
                 if (categoryName == "Sites Web") {
                     categoriesRef
                         .whereEqualTo("nome", "Sites Web")
@@ -785,7 +794,6 @@ private fun PasswordCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Mostra senha ou oculta com asteriscos
                 Text(
                     text = if (visible) entry.senha else "••••••••••",
                     modifier = Modifier.weight(1f),
@@ -799,8 +807,6 @@ private fun PasswordCard(
                     )
                 }
             }
-
-            // Linha de ações para cada cartão
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -812,7 +818,6 @@ private fun PasswordCard(
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
-
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -854,7 +859,7 @@ private fun CategorySelector(
     }
 }
 
-// Modelo de dados para os itens de senha
+// Modelo de dados para SenhaEntry
 data class SenhaEntry(
     val id: String,
     val servico: String,
@@ -862,7 +867,7 @@ data class SenhaEntry(
     val categoria: String = ""
 )
 
-// Modelo de dados para categorias
+// Modelo de dados para CategoryData
 data class CategoryData(
     val id: String = "",
     val nome: String = "",
