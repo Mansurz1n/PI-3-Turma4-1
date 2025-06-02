@@ -116,7 +116,7 @@ fun TutorialScreen(navController: NavController) {
             Spacer(Modifier.height(24.dp))
 
             Button(
-                onClick = { navController.popBackStack() },
+                onClick = { navController.navigate("intro") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
