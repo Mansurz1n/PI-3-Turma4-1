@@ -76,8 +76,8 @@ O SuperID é um ecossistema completo de gerenciamento de autenticações que ofe
 
  Abrir o site (arquivo HTML),
 - Após clonar, localize a pasta onde está o arquivo HTML do site (geralmente ./site ou ./web).
-- Dentro dessa pasta, você deverá encontrar um arquivo chamado index.html (ou algo semelhante).
-- Para visualizar no navegador localize index.html no explorador de arquivos do seu sistema operacional.
+- Dentro dessa pasta, você deverá encontrar um arquivo chamado Login.html.
+- Para visualizar no navegador localize Login.html no explorador de arquivos do seu sistema operacional.
 - Dê um duplo-clique nele. Isso abrirá a página no navegador padrão.
 
 Abrir o projeto Android no Android Studio
