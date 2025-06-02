@@ -70,51 +70,42 @@ O SuperID é um ecossistema completo de gerenciamento de autenticações que ofe
 - **@JCChiozzini** 
 
 ## :rocket: Como Executar
+- Abra um terminal (ou Git Bash) e execute:
+   "git clone https://github.com/Mansurz1n/PI-3-Turma4-1/tree/main"
+- cd seu-repositorio
+
+ Abrir o site (arquivo HTML),
+- Após clonar, localize a pasta onde está o arquivo HTML do site (geralmente ./site ou ./web).
+- Dentro dessa pasta, você deverá encontrar um arquivo chamado index.html (ou algo semelhante).
+- Para visualizar no navegador localize index.html no explorador de arquivos do seu sistema operacional.
+- Dê um duplo-clique nele. Isso abrirá a página no navegador padrão.
+
 Abrir o projeto Android no Android Studio
-Inicie o Android Studio.
+- Inicie o Android Studio.
+- Na tela de boas-vindas, clique em “Open an existing project” (ou “Open”).
+- Navegue até a pasta raiz do repositório que você acabou de clonar.
+- Selecione a subpasta do módulo Android.
+- Exemplo: seu-repositorio/android-app/ ou simplesmente seu-repositorio/.
+- Clique em “OK” ou “Open” para carregar o projeto.
+- Aguarde o Gradle sincronizar automaticamente:
+- O Android Studio irá baixar todas as dependências necessárias e configurar o ambiente.
+- Se aparecer alguma notificação pedindo para atualizar o Gradle ou o plugin, clique em “Update” para ficar na versão recomendada.
 
-Na tela de boas-vindas, clique em “Open an existing project” (ou “Open”).
-
-Navegue até a pasta raiz do repositório que você acabou de clonar.
-
-Selecione a subpasta do módulo Android.
-
-Exemplo: seu-repositorio/android-app/ ou simplesmente seu-repositorio/.
-
-Clique em “OK” ou “Open” para carregar o projeto.
-
-Aguarde o Gradle sincronizar automaticamente:
-
-O Android Studio irá baixar todas as dependências necessárias e configurar o ambiente.
-
-Se aparecer alguma notificação pedindo para atualizar o Gradle ou o plugin, clique em “Update” para ficar na versão recomendada.
 Executar no Emulador ou Dispositivo
-Conecte um dispositivo Android físico (ativando a depuração USB) ou
-crie/emule um Android Virtual Device (AVD) no Android Studio:
-
-Vá em “AVD Manager” (ícone de celular no canto superior direito)
-
-Clique em “Create Virtual Device”, escolha um modelo e API desejada, e finalize.
-
-Com o projeto aberto, selecione o Módulo “app” no menu de execução (geralmente aparece já selecionado).
-
-Escolha o dispositivo/alvo (seu AVD ou dispositivo físico) e clique em Run ▶ (ícone de play).
-
-Aguarde a instalação/aplicação ser iniciada no dispositivo:
-
-Se tudo estiver configurado corretamente, o app será instalado e aberto automaticamente.
-Abrir o site (arquivo HTML),
-Após clonar, localize a pasta onde está o arquivo HTML do site (geralmente ./site ou ./web).
-
-Dentro dessa pasta, você deverá encontrar um arquivo chamado index.html (ou algo semelhante).
-
-Para visualizar no navegador localize index.html no explorador de arquivos do seu sistema operacional.
-
-Dê um duplo-clique nele. Isso abrirá a página no navegador padrão.
+- Conecte um dispositivo Android físico (ativando a depuração USB) ou
+- crie/emule um Android Virtual Device (AVD) no Android Studio:
+- Vá em “AVD Manager” (ícone de celular no canto superior direito)
+- Clique em “Create Virtual Device”, escolha um modelo e API desejada, e finalize.
+- Com o projeto aberto, selecione o Módulo “app” no menu de execução (geralmente aparece já selecionado).
+- Escolha o dispositivo/alvo (seu AVD ou dispositivo físico) e clique em Run ▶ (ícone de play).
+- Aguarde a instalação/aplicação ser iniciada no dispositivo:
+- Se tudo estiver configurado corretamente, o app será instalado e aberto automaticamente.
+  
 ### Pré-requisitos
 - Android Studio (para desenvolvimento mobile)
 - Node.js (para Firebase Functions)
 - Conta Firebase com projetos configurados
+- Arquivo login.html
 
 ### Configuração
 1. Clone o repositório:
