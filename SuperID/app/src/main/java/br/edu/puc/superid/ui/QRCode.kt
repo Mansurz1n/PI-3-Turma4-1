@@ -106,7 +106,7 @@ private fun CameraContent(navController: NavController) {
                 scannedValue = null
                 return@let
             }
-
+//aqui
             try {
                 val document = firestore.collection("logins").document(qrCode).get().await()
                 if (document.exists() && document.getString("status") != "completed") {
