@@ -69,6 +69,12 @@ O SuperID é um ecossistema completo de gerenciamento de autenticações que ofe
 - **@FlavioDario0** 
 - **@JCChiozzini** 
 
+### Pré-requisitos
+- Android Studio (para desenvolvimento mobile)
+- Node.js (para Firebase Functions)
+- Conta Firebase com projetos configurados
+- Arquivo login.html
+
 ## :rocket: Como Executar
 - Abra um terminal (ou Git Bash) e execute:
    "git clone https://github.com/Mansurz1n/PI-3-Turma4-1/tree/main"
@@ -101,8 +107,3 @@ Executar no Emulador ou Dispositivo
 - Aguarde a instalação/aplicação ser iniciada no dispositivo:
 - Se tudo estiver configurado corretamente, o app será instalado e aberto automaticamente.
   
-### Pré-requisitos
-- Android Studio (para desenvolvimento mobile)
-- Node.js (para Firebase Functions)
-- Conta Firebase com projetos configurados
-- Arquivo login.html
