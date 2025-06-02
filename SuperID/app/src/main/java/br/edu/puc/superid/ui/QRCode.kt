@@ -10,6 +10,7 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import com.google.firebase.firestore.FieldValue
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.FlipCameraAndroid
 import androidx.compose.material3.Button
@@ -50,377 +52,419 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import br.edu.puc.superid.R
 import br.edu.puc.superid.ui.scannerConfig.WithPermission
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
-import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.firestore.toObject
 import com.google.firebase.ktx.Firebase
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.delay
+import java.util.concurrent.Executors
 
 @Composable
-fun a (navController: NavController){
-
+fun QRCodeScreen(navController: NavController) {
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         WithPermission(
             modifier = Modifier.padding(innerPadding),
             permission = Manifest.permission.CAMERA
         ) {
-        CameraAppScreen()
+            CameraContent(navController)
         }
     }
 }
 
-
-@OptIn(ExperimentalGetImage::class)
 @Composable
-fun CameraAppScreen() {
+private fun CameraContent(navController: NavController) {
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     val imageCaptureUseCase = remember { ImageCapture.Builder().build() }
     var scannedValue by remember { mutableStateOf<String?>(null) }
-    var flashligt by remember { mutableStateOf(false) }
-    var showDialog by remember { mutableStateOf(false) }
-    var showScreen1 by remember { mutableStateOf(true) }
+    var flashEnabled by remember { mutableStateOf(false) }
+    var showConfirmation by remember { mutableStateOf(false) }
+    var partnerName by remember { mutableStateOf("") }
+    var showSuccess by remember { mutableStateOf(false) }
 
-    val firestore =  Firebase.firestore
+    val firestore = Firebase.firestore
+    val auth = Firebase.auth
 
-    fun fire(qrcode:String, callback:(String) ->Unit){
-        val qrc = firestore.collection("logins").document(qrcode)
-            .get()
-            .addOnSuccessListener {
-                document ->
-                if(document.data != null) {
-                    val api = document.data!!.get("API")
-                    val name = api.toString()
-                    showScreen1 = false
-                    callback(name)
+    LaunchedEffect(scannedValue) {
+        scannedValue?.let { qrCode ->
+            try {
+                val document = firestore.collection("logins").document(qrCode).get().await()
+                if (document.exists() && document.getString("status") != "completed") {
+                    val apiKey = document.getString("API") ?: ""
+
+                    firestore.collection("partners")
+                        .whereEqualTo("apiKey", apiKey)
+                        .get()
+                        .addOnSuccessListener { querySnapshot ->
+                            if (!querySnapshot.isEmpty) {
+                                val partnerDoc = querySnapshot.documents[0]
+                                partnerName = partnerDoc.getString("nome") ?: "Site Parceiro"
+                            }
+                            showConfirmation = true
+                        }
                 }
-            }.addOnFailureListener {
-                    Log.e("Firestore fire","" )
-                callback("")
+            } catch (e: Exception) {
+                Log.e("QRCode", "Erro ao processar QR Code", e)
             }
-    }
-    fun oi(document:DocumentSnapshot) {
-
-    }
-    fun res(res:String,qrcode:String){
-        val conta = Firebase.auth.currentUser
-        val qrC = firestore.collection("logins").document(qrcode)
-        if (res == "yes") {
-            val uid = conta?.uid
-            qrC.update("UserID", uid)
-                .addOnSuccessListener { Log.d("firestore res","Update feito com sucess") }
-                .addOnFailureListener { Log.e("Firestore  res","Update deu bosta") }
-        } else {
-            qrC.update(qrcode, FieldValue.increment(-1))
-                .addOnSuccessListener { Log.d("firestore res ","Tentaviva -1") }
         }
     }
 
+    fun confirmLogin() {
+        val user = auth.currentUser ?: return
+        scannedValue?.let { qrCode ->
+            val updates = hashMapOf<String, Any>(
+                "UserID" to user.uid,
+                "status" to "completed",
+                "email" to (user.email ?: ""),
+                "displayName" to (user.displayName ?: ""),
+            )
+
+            firestore.collection("logins").document(qrCode)
+                .update(updates)
+                .addOnSuccessListener {
+                    showSuccess = true
+                    showConfirmation = false
+                }
+                .addOnFailureListener { e ->
+                    Log.e("QRCode", "Erro ao confirmar login", e)
+                }
+        }
+    }
+
+    LaunchedEffect(showSuccess) {
+        if (showSuccess) {
+            delay(2000)
+            navController.navigate("home") {
+                popUpTo("qrCode") { inclusive = true }
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
+        CameraPreview(
+            modifier = Modifier.fillMaxSize(),
+            lensFacing = lensFacing,
+            zoomLevel = 0f,
+            imageCaptureUseCase = imageCaptureUseCase,
+            onQRCodeScanned = { value ->
+                if (value != null && scannedValue == null) {
+                    scannedValue = value
+                }
+            },
+            flash = flashEnabled,
+            onFlashToggle = { enabled -> flashEnabled = enabled }
+        )
+
+        if (showConfirmation) {
+            ConfirmationDialog(
+                partnerName = partnerName,
+                onConfirm = { confirmLogin() },
+                onCancel = {
+                    showConfirmation = false
+                    scannedValue = null
+                }
+            )
+        }
+
+        if (showSuccess) {
+            SuccessDialog()
+        }
+
+        if (!showConfirmation && !showSuccess) {
+            CameraControls(
+                flashEnabled = flashEnabled,
+                onFlashToggle = { flashEnabled = !flashEnabled },
+                onFlipCamera = {
+                    lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                        CameraSelector.LENS_FACING_FRONT
+                    } else {
+                        CameraSelector.LENS_FACING_BACK
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConfirmationDialog(
+    partnerName: String,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.7f)),
+        contentAlignment = Alignment.Center
+    ) {
         Column(
-            modifier = Modifier
-                .width(360.dp)
-                .fillMaxHeight()
-                .align(Alignment.Center)
-                .background(Color.Black)
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(24.dp)
         ) {
-            // Top blue header with logo
-            Box(
+            Text(
+                text = "Confirme o Login",
+                fontSize = 14.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Normal
+            )
+            Text(
+                text = "Logar em:",
+                fontSize = 14.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Normal
+            )
+            Text(
+                text = partnerName,
+                fontSize = 12.sp,
+                color = Color(0xFFB0B0B0),
+                fontWeight = FontWeight.Light
+            )
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(Color(0xFFD40000)),
                 modifier = Modifier
-                    .height(60.dp)
-                    .fillMaxWidth()
-                    .background(Color(0xFF72CEF2)),
-                contentAlignment = Alignment.Center
+                    .padding(top = 8.dp)
+                    .width(160.dp)
+                    .height(48.dp)
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo), // Replace with your drawable
-                    contentDescription = "Joker logo with red and black jester hat and white face",
-                    modifier = Modifier.size(40.dp)
+                Text(
+                    text = "Confirmar",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Site errado?",
+                    fontSize = 12.sp,
+                    color = Color(0xFFB0B0B0)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .background(Color(0xFF5DF0FF), shape = RoundedCornerShape(4.dp))
+                        .clickable(onClick = onCancel)
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "Cancelar",
+                        fontSize = 12.sp,
+                        color = Color.Black
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuccessDialog() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.7f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(280.dp)
+                .height(160.dp)
+                .background(Color.White, shape = RoundedCornerShape(8.dp))
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Success",
+                    tint = Color.Green,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Login realizado com sucesso!",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CameraControls(
+    flashEnabled: Boolean,
+    onFlashToggle: () -> Unit,
+    onFlipCamera: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.weight(1f))
+
+        Box(
+            modifier = Modifier
+                .size(250.dp)
+                .background(Color.Transparent)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            IconButton(
+                onClick = onFlashToggle,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.8f))
+            ) {
+                Icon(
+                    Icons.Default.FlashlightOn,
+                    contentDescription = "Flash",
+                    tint = Color.Black,
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
-            Box(
+            IconButton(
+                onClick = onFlipCamera,
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.8f))
             ) {
-                // Background image
-                CameraPreview(
-                    modifier = Modifier.fillMaxSize(),
-                    lensFacing = lensFacing,
-                    zoomLevel = 0f,
-                    imageCaptureUseCase = imageCaptureUseCase,
-                    onQRCodeScanned = { value -> fire(scannedValue) {name->}= value },
-                    flash = flashligt,
-                    onFlashToggle = {
-                        enabled -> flashligt = enabled
-                    }
-                );
-                if (showScreen1) {
-                // Screen 1: scanning frame and bottom icons
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                Icon(
+                    Icons.Default.FlipCameraAndroid,
+                    contentDescription = "Flip Camera",
+                    tint = Color.Black,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
 
-                    // Bottom icons row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 32.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.8f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            IconButton(onClick = {
-                                if (flashligt == true){
-                                    flashligt = false
-                                }else {
-                                    flashligt =true
-                                }
-                            }) {
-                            Icon(
-                                Icons.Default.FlashlightOn , // Replace with your icon
-                                contentDescription = "Flashlight button",
-                                tint = Color.Black,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.8f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            IconButton(onClick = {
-                                lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
-                                    CameraSelector.LENS_FACING_FRONT
-                                } else {
-                                    CameraSelector.LENS_FACING_BACK
-                                }
-                            }) {
-                                Icon(
-                                    Icons.Default.FlipCameraAndroid, // Replace with your icon
-                                    contentDescription = "Gallery button",
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(24.dp)
-                                )
+@OptIn(ExperimentalGetImage::class)
+@Composable
+fun CameraPreview(
+    modifier: Modifier = Modifier,
+    lensFacing: Int,
+    zoomLevel: Float,
+    imageCaptureUseCase: ImageCapture,
+    onQRCodeScanned: (String?) -> Unit,
+    flash: Boolean,
+    onFlashToggle: (Boolean) -> Unit
+) {
+    val previewUseCase = remember { Preview.Builder().build() }
+    val imageAnalysisUseCase = remember {
+        ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+    }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
+    val localContext = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    val barcodeScanner = remember { BarcodeScanning.getClient() }
+    val executor = remember { Executors.newSingleThreadExecutor() }
+
+    DisposableEffect(barcodeScanner) {
+        val analyzer = ImageAnalysis.Analyzer { imageProxy ->
+            val mediaImage = imageProxy.image
+            if (mediaImage != null) {
+                val inputImage =
+                    InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                barcodeScanner.process(inputImage)
+                    .addOnSuccessListener { barcodes ->
+                        for (barcode in barcodes) {
+                            barcode.rawValue?.let { rawValue ->
+                                onQRCodeScanned(rawValue)
                             }
                         }
                     }
-                }
+                    .addOnCompleteListener {
+                        imageProxy.close()
+                    }
             } else {
-                // Screen 2: confirmation overlay
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.7f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.padding(24.dp)
-                    ) {
-                        Text(
-                            text = "Confirme o Login",
-                            fontSize = 14.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.Normal
-                        )
-                        Text(
-                            text = "Logar em:",
-                            fontSize = 14.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.Normal
-                        )
-                        Text(
-                            text = "",
-                            fontSize = 12.sp,
-                            color = Color(0xFFB0B0B0),
-                            fontWeight = FontWeight.Light
-                        )
-                        Button(
-                            onClick = { res("yes","") },
-                            colors = ButtonDefaults.buttonColors(Color(0xFFD40000)),
-                            modifier = Modifier
-                                .padding(top = 8.dp)
-                                .width(160.dp)
-                                .height(48.dp)
-                        ) {
-                            Text(
-                                text = "Confirmar",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
-                        }
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "Site errado:",
-                                fontSize = 12.sp,
-                                color = Color(0xFFB0B0B0)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(Color(0xFF5DF0FF), shape = RoundedCornerShape(4.dp))
-                                    .clickable { /* Edit action */ }
-                                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = "Editar",
-                                    fontSize = 12.sp,
-                                    color = Color.Black
-                                )
-                            }
-                        }
-                    }
-                }
+                imageProxy.close()
             }
-            }
+        }
+        imageAnalysisUseCase.setAnalyzer(executor, analyzer)
 
-                // Show scanned QR code value if exists
-                scannedValue?.let {
-                    showScreen1 = false
-                    Text(
-                        text = "QR Code: $it",
-                        color = Color.White,
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.7f))
-                            .padding(8.dp)
-                    )
-
-                }
-            }
+        onDispose {
+            imageAnalysisUseCase.clearAnalyzer()
+            executor.shutdown()
         }
     }
 
-    @OptIn(ExperimentalGetImage::class)
-    @Composable
-    fun CameraPreview(
-        modifier: Modifier = Modifier,
-        lensFacing: Int,
-        zoomLevel: Float,
-        imageCaptureUseCase: ImageCapture,
-        onQRCodeScanned: (String) -> Unit,
-        flash : Boolean,
-        onFlashToggle : (Boolean) -> Unit
-    ) {
-        val previewUseCase = remember { Preview.Builder().build() }
-        val imageAnalysisUseCase = remember {
-            ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-        }
-        var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
-        var cameraControl by remember { mutableStateOf<CameraControl?>(null) }
-        val localContext = LocalContext.current
-        val lifecycleOwner = LocalLifecycleOwner.current
-
-        // Remember barcode scanner client
-        val barcodeScanner = remember { BarcodeScanning.getClient() }
-
-        // Analyzer for imageAnalysisUseCase
-        DisposableEffect(barcodeScanner) {
-            val analyzer = ImageAnalysis.Analyzer { imageProxy ->
-                val mediaImage = imageProxy.image
-                if (mediaImage != null) {
-                    val inputImage =
-                        InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                    barcodeScanner.process(inputImage)
-                        .addOnSuccessListener { barcodes ->
-                            for (barcode in barcodes) {
-                                barcode.rawValue?.let { rawValue ->
-                                    onQRCodeScanned(rawValue)
-                                }
-                            }
-                        }
-                        .addOnCompleteListener {
-                            imageProxy.close()
-                        }
-                        .addOnFailureListener {
-                            imageProxy.close()
-                        }
-                } else {
-                    imageProxy.close()
-                }
-            }
-            imageAnalysisUseCase.setAnalyzer(ContextCompat.getMainExecutor(localContext), analyzer)
-
-            onDispose {
-                imageAnalysisUseCase.clearAnalyzer()
-            }
-        }
-
-        fun bindCamera() {
-            val selector = CameraSelector.Builder()
-                .requireLensFacing(lensFacing)
-                .build()
-            cameraProvider?.unbindAll()
-            val camera = cameraProvider?.bindToLifecycle(
-                lifecycleOwner,
-                selector,
-                previewUseCase,
-                imageCaptureUseCase,
-                imageAnalysisUseCase
-            )
-            cameraControl = camera?.cameraControl
-        }
-
-        LaunchedEffect(lensFacing) {
-            cameraProvider = ProcessCameraProvider.getInstance(localContext).get()
-            bindCamera()
-        }
-
-        LaunchedEffect(flash) {
-            cameraControl?.enableTorch(flash)
-            onFlashToggle(flash)
-        }
-
-        LaunchedEffect(zoomLevel) {
-            cameraControl?.setLinearZoom(zoomLevel)
-        }
-
-        AndroidView(
-            modifier = modifier.fillMaxSize(),
-            factory = { context ->
-                PreviewView(context).also {
-                    previewUseCase.setSurfaceProvider(it.surfaceProvider)
-                }
-            }
+    fun bindCamera() {
+        val selector = CameraSelector.Builder()
+            .requireLensFacing(lensFacing)
+            .build()
+        cameraProvider?.unbindAll()
+        val camera = cameraProvider?.bindToLifecycle(
+            lifecycleOwner,
+            selector,
+            previewUseCase,
+            imageCaptureUseCase,
+            imageAnalysisUseCase
         )
+        cameraControl = camera?.cameraControl
     }
 
+    LaunchedEffect(lensFacing) {
+        val provider = ProcessCameraProvider.getInstance(localContext).get()
+        cameraProvider = provider
+        bindCamera()
+    }
+
+    LaunchedEffect(flash) {
+        cameraControl?.enableTorch(flash)
+        onFlashToggle(flash)
+    }
+
+    LaunchedEffect(zoomLevel) {
+        cameraControl?.setLinearZoom(zoomLevel)
+    }
+
+    AndroidView(
+        modifier = modifier.fillMaxSize(),
+        factory = { context ->
+            PreviewView(context).also {
+                previewUseCase.setSurfaceProvider(it.surfaceProvider)
+            }
+        }
+    )
+}
