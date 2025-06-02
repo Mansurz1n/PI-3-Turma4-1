@@ -106,8 +106,3 @@ Executar no Emulador ou Dispositivo
 - Node.js (para Firebase Functions)
 - Conta Firebase com projetos configurados
 - Arquivo login.html
-
-### Configuração
-1. Clone o repositório:
-   ```bash
-   git clone https://github.com/Mansurz1n/PI-3-Semestre.git
