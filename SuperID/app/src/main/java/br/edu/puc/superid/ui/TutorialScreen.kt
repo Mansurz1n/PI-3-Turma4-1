@@ -25,38 +25,22 @@ fun TutorialScreen(navController: NavController) {
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                // Removemos navigationIcon e texto; centralizamos apenas a logo
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            "Tutorial do SuperID",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Spacer(modifier = Modifier.weight(2f))
                         Image(
                             painter = painterResource(id = R.drawable.logo),
                             contentDescription = "Logo SuperID",
-                            modifier = Modifier
-                                .size(40.dp)
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = "Voltar",
-                            tint = MaterialTheme.colorScheme.onPrimary
+                            modifier = Modifier.size(40.dp)
                         )
                     }
                 },
                 colors = TopAppBarDefaults.smallTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         }
@@ -71,22 +55,63 @@ fun TutorialScreen(navController: NavController) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                "Bem-vindo(a) ao tutorial do SuperID!",
+                "Bem-vindo ao SuperID",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Divider()
 
             tutorialStep(
-                "1️⃣ Abra sua mente (não literalmente)",
-                "Esqueça tudo que você já ouviu sobre gerenciadores de senhas. Aqui é frustração."
+                title = "1️⃣ O que é o SuperID",
+                description = "O SuperID é um gerenciador de autenticações que unifica o armazenamento seguro de senhas pessoais " +
+                        "e oferece login sem senha junto a sites parceiros. Nesta aplicação, você criará uma conta, manterá " +
+                        "suas credenciais criptografadas e poderá autorizar acessos externos por QR Code."
             )
-            tutorialStep("2️⃣ Leia os termos", "Você vai clicar naquela caixa chatinha… fique tranquilo, quase ninguém lê mesmo.")
-            tutorialStep("3️⃣ Crie sua conta", "Insira nome, e-mail e senha mestre. Se errar, reveja o passo 1 e tente de novo.")
-            tutorialStep("4️⃣ Cadastre senhas", "Sites, apps, cofres, sonhos… se lembrar, a gente guarda.")
-            tutorialStep("5️⃣ Login sem senha", "Escaneie, confirme e… voilà, você está logado.")
-            tutorialStep("6️⃣ Esqueceu a senha?", "Clique em “Esqueci minha senha” e receba o link de redefinição.")
-            tutorialStep("7️⃣ Fique tranquilo(a)", "Se vazar sua senha, a culpa é do seu doppelgänger digital.")
+
+            tutorialStep(
+                title = "2️⃣ Cadastro de Conta Inicial",
+                description = "Ao abrir o aplicativo pela primeira vez, será exibida uma breve explicação sobre o SuperID. " +
+                        "Confirme a aceitação dos Termos de Uso para prosseguir com o cadastro. Forneça Nome, E-mail " +
+                        "e uma Senha Mestre. Após preencher, um e-mail de validação será enviado pelo Firebase Authentication. " +
+                        "Valide o seu e-mail para que todos os recursos de login sem senha funcionem corretamente."
+            )
+
+            tutorialStep(
+                title = "3️⃣ Armazenamento no Firestore",
+                description = "Após criar a conta, o aplicativo salva no Firebase Firestore um documento com o seu UID " +
+                        "e o identificador do dispositivo (IMEI). Isso permite associar seu perfil ao aparelho utilizado."
+            )
+
+            tutorialStep(
+                title = "4️⃣ Gerenciamento de Senhas Pessoais",
+                description = "No menu principal, acesse 'Gerenciar Senhas'. Cada senha é organizada em categorias " +
+                        "(por exemplo: Sites Web, Aplicativos, Teclados Físicos). Para cadastrar uma nova senha, informe " +
+                        "o nome do serviço, a credencial e, opcionalmente, uma descrição. O SuperID gera um token " +
+                        "Base64 de 256 caracteres e criptografa o dado antes de armazenar no Firestore. Use as opções " +
+                        "disponíveis para editar ou remover entradas existentes."
+            )
+
+            tutorialStep(
+                title = "5️⃣ Login Sem Senha com Parceiros",
+                description = "Para acessar um site parceiro sem digitar sua Senha Mestre, selecione 'Login Sem Senha'. " +
+                        "Digite sua Senha Mestre para desbloquear a câmera e escanear o QR Code gerado pelo parceiro. " +
+                        "O aplicativo atualizará no Firestore o documento de login com seu UID e horário de acesso, " +
+                        "autorizando o site a completar o processo de autenticação."
+            )
+
+            tutorialStep(
+                title = "6️⃣ Recuperar Senha Mestre",
+                description = "Se você esquecer sua Senha Mestre, utilize a opção 'Esqueci Minha Senha'. " +
+                        "Informe o e-mail cadastrado e, desde que já tenha validado seu e-mail, um link de " +
+                        "redefinição será enviado. Siga o passo a passo no e-mail para criar uma nova senha."
+            )
+
+            tutorialStep(
+                title = "7️⃣ Boas Práticas de Segurança",
+                description = "Mantenha sempre sua conta e dispositivo protegidos: use uma Senha Mestre forte (mínimo 6 caracteres), " +
+                        "não compartilhe seu aparelho nem o token Base64 gerado para cada senha. Caso identifique acesso não autorizado, " +
+                        "altere sua Senha Mestre imediatamente e revogue sessões em dispositivos extras, se necessário."
+            )
 
             Spacer(Modifier.height(24.dp))
 

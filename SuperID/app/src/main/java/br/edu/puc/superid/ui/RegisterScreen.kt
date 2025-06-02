@@ -1,11 +1,13 @@
+// RegisterScreen.kt
+
 package br.edu.puc.superid.ui
 
 import android.provider.Settings
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,13 +16,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import br.edu.puc.superid.R
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import java.security.MessageDigest
@@ -28,10 +36,18 @@ import java.security.MessageDigest
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterScreen(navController: NavController) {
+    // Estados de campos e validações
     var nome by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
     var aceitarTermos by remember { mutableStateOf(false) }
+
+    var nomeError by remember { mutableStateOf<String?>(null) }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var senhaError by remember { mutableStateOf<String?>(null) }
+    var authError by remember { mutableStateOf<String?>(null) }
+
+    // Estados para "Termos de Uso"
     var mostrarDialogo by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -54,6 +70,7 @@ fun RegisterScreen(navController: NavController) {
                 .padding(bottom = 24.dp)
         )
 
+        // Título
         Text(
             "Cadastro no SuperID!",
             style = MaterialTheme.typography.headlineSmall.copy(fontSize = 26.sp),
@@ -61,71 +78,165 @@ fun RegisterScreen(navController: NavController) {
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
+        // Campo Nome com asterisco e validação
         OutlinedTextField(
             value = nome,
-            onValueChange = { nome = it },
-            label = { Text("Nome") },
+            onValueChange = {
+                nome = it
+                nomeError = null
+                authError = null
+            },
+            label = {
+                val annotated = buildAnnotatedString {
+                    append("Nome")
+                    withStyle(
+                        style = androidx.compose.ui.text.SpanStyle(
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
+                        append(" *")
+                    }
+                }
+                Text(text = annotated)
+            },
             singleLine = true,
+            isError = nomeError != null,
             textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface),
             colors = TextFieldDefaults.outlinedTextFieldColors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedBorderColor = if (nomeError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = if (nomeError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 containerColor = MaterialTheme.colorScheme.surface,
                 cursorColor = MaterialTheme.colorScheme.primary,
-                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                focusedLabelColor = if (nomeError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
             ),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
         )
+        if (nomeError != null) {
+            Text(
+                text = nomeError!!,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 4.dp)
+            )
+        }
 
+        // Campo Email com asterisco e validação
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
+            onValueChange = {
+                email = it
+                emailError = null
+                authError = null
+            },
+            label = {
+                val annotated = buildAnnotatedString {
+                    append("Email")
+                    withStyle(
+                        style = androidx.compose.ui.text.SpanStyle(
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
+                        append(" *")
+                    }
+                }
+                Text(text = annotated)
+            },
             singleLine = true,
+            isError = emailError != null,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface),
             colors = TextFieldDefaults.outlinedTextFieldColors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedBorderColor = if (emailError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = if (emailError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 containerColor = MaterialTheme.colorScheme.surface,
                 cursorColor = MaterialTheme.colorScheme.primary,
-                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                focusedLabelColor = if (emailError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
             ),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
         )
+        if (emailError != null) {
+            Text(
+                text = emailError!!,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 4.dp)
+            )
+        }
 
+        // Campo Senha com asterisco e validação
         OutlinedTextField(
             value = senha,
-            onValueChange = { senha = it },
-            label = { Text("Senha") },
+            onValueChange = {
+                senha = it
+                senhaError = null
+                authError = null
+            },
+            label = {
+                val annotated = buildAnnotatedString {
+                    append("Senha")
+                    withStyle(
+                        style = androidx.compose.ui.text.SpanStyle(
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
+                        append(" *")
+                    }
+                }
+                Text(text = annotated)
+            },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
+            isError = senhaError != null,
             textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface),
             colors = TextFieldDefaults.outlinedTextFieldColors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedBorderColor = if (senhaError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = if (senhaError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 containerColor = MaterialTheme.colorScheme.surface,
                 cursorColor = MaterialTheme.colorScheme.primary,
-                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                focusedLabelColor = if (senhaError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
             ),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
         )
+        if (senhaError != null) {
+            Text(
+                text = senhaError!!,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 4.dp)
+            )
+        }
 
+        Spacer(Modifier.height(8.dp))
+
+        // Checkbox de Termos de Uso
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(vertical = 16.dp)
         ) {
             Checkbox(
                 checked = aceitarTermos,
-                onCheckedChange = { aceitarTermos = it },
+                onCheckedChange = {
+                    aceitarTermos = it
+                    authError = null
+                },
                 colors = CheckboxDefaults.colors(
                     checkedColor = MaterialTheme.colorScheme.primary
                 )
@@ -140,42 +251,74 @@ fun RegisterScreen(navController: NavController) {
             )
         }
 
+        // Botão "Cadastrar" com erros centralizados
         Button(
             onClick = {
-                if (nome.isBlank() || email.isBlank() || senha.isBlank()) {
-                    Toast.makeText(context, "Preencha todos os campos!", Toast.LENGTH_SHORT).show()
-                    return@Button
+                // Limpa erros anteriores
+                nomeError = null
+                emailError = null
+                senhaError = null
+                authError = null
+
+                // Validação de campos
+                var valid = true
+                if (nome.isBlank()) {
+                    nomeError = "Campo obrigatório"
+                    valid = false
                 }
-                auth.createUserWithEmailAndPassword(email, senha)
-                    .addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            val user = auth.currentUser!!
-                            user.sendEmailVerification()
-                            val androidId = Settings.Secure.getString(
-                                context.contentResolver,
-                                Settings.Secure.ANDROID_ID
-                            )
-                            val hashed = hashPassword(senha)
-                            db.collection("usuarios").document(user.uid).set(
-                                mapOf(
-                                    "uid" to user.uid,
-                                    "nome" to nome,
-                                    "email" to email,
-                                    "senha" to hashed,
-                                    "androidId" to androidId
+                if (email.isBlank()) {
+                    emailError = "Campo obrigatório"
+                    valid = false
+                }
+                if (senha.isBlank()) {
+                    senhaError = "Campo obrigatório"
+                    valid = false
+                }
+                if (!aceitarTermos) {
+                    authError = "Você deve aceitar os Termos de Uso"
+                    valid = false
+                }
+
+                if (valid) {
+                    auth.createUserWithEmailAndPassword(email.trim(), senha)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                val user = auth.currentUser!!
+                                user.sendEmailVerification()
+                                val androidId = Settings.Secure.getString(
+                                    context.contentResolver,
+                                    Settings.Secure.ANDROID_ID
                                 )
-                            ).addOnSuccessListener {
-                                Toast.makeText(context, "Cadastro realizado!", Toast.LENGTH_LONG).show()
-                                navController.navigate("login")
+                                val hashed = hashPassword(senha)
+                                db.collection("usuarios").document(user.uid).set(
+                                    mapOf(
+                                        "uid" to user.uid,
+                                        "nome" to nome,
+                                        "email" to email,
+                                        "senha" to hashed,
+                                        "androidId" to androidId
+                                    )
+                                ).addOnSuccessListener {
+                                    navController.navigate("login")
+                                }.addOnFailureListener { e ->
+                                    authError = e.message ?: "Erro ao salvar usuário"
+                                }
+                            } else {
+                                // Traduzir o erro para português
+                                val exception = task.exception
+                                val errorCode = (exception as? FirebaseAuthException)?.errorCode
+
+                                authError = when (errorCode) {
+                                    "ERROR_INVALID_EMAIL" -> "E-mail mal formatado"
+                                    "ERROR_EMAIL_ALREADY_IN_USE" -> "E-mail já cadastrado"
+                                    "ERROR_WEAK_PASSWORD" -> "Senha muito fraca (mín. 6 caracteres)"
+                                    "ERROR_OPERATION_NOT_ALLOWED" -> "Cadastro não permitido"
+                                    else -> exception?.localizedMessage
+                                        ?: "Erro desconhecido no cadastro"
+                                }
                             }
-                        } else {
-                            Toast.makeText(
-                                context,
-                                "Erro: ${task.exception?.message}",
-                                Toast.LENGTH_LONG
-                            ).show()
                         }
-                    }
+                }
             },
             enabled = aceitarTermos,
             modifier = Modifier
@@ -189,15 +332,32 @@ fun RegisterScreen(navController: NavController) {
             Text("Cadastrar")
         }
 
+        // Texto de erro geral (autenticação ou termos), centralizado
+        if (authError != null) {
+            Text(
+                text = authError!!,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+            )
+        }
+
         Spacer(Modifier.height(12.dp))
 
+        // Texto "Já possuo conta"
         TextButton(
             onClick = { navController.navigate("login") },
             colors = ButtonDefaults.textButtonColors(
                 contentColor = MaterialTheme.colorScheme.primary
             )
         ) {
-            Text("Já possuo conta", textDecoration = TextDecoration.Underline)
+            Text(
+                "Já possuo conta",
+                textDecoration = TextDecoration.Underline
+            )
         }
     }
 
@@ -207,34 +367,89 @@ fun RegisterScreen(navController: NavController) {
             title = { Text("Termos de Uso") },
             text = {
                 Column(
-                    Modifier
+                    modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp)
                         .verticalScroll(rememberScrollState())
+                        .padding(end = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // 1. Aceitação
                     Text(
-                        """
-                        1️⃣ Aceitação
-                        Ao utilizar este aplicativo, você automaticamente concorda com absolutamente tudo que está escrito aqui, mesmo sem ter lido nada (porque ninguém lê, né?). Qualquer choro posterior será ignorado com sucesso.
+                        "1. Aceitação",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "Ao usar o SuperID, você concorda com estes Termos de Uso. Se não concordar, não deve utilizar o aplicativo.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 16.sp
+                    )
 
-                        2️⃣ Coleta de Dados (ou quase isso)
-                        A gente coleta tudo. Seu nome, seu e-mail, sua senha, seu Android ID (porque a gente precisa parecer sério, nem sei se isso existe), seu histórico de navegação, seus sonhos, suas frustrações e até aquela busca estranha que você fez às 3h da manhã. E sim, a gente julga todas elas.
+                    // 2. Cadastro de Conta
+                    Text(
+                        "2. Cadastro de Conta",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "Para criar sua conta, informe Nome, E-mail válido e Senha Mestre (mín. 6 caracteres). É necessário confirmar seu e-mail para concluir o cadastro.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 16.sp
+                    )
 
-                        3️⃣ Uso das Informações
-                        Usaremos seus dados para coisas super importantes, como guardar suas senhas… e, sei lá, talvez vender para a Associação dos Illuminati. Mas fique tranquilo, só em casos extremos (ou quando estiver precisando pagar o boleto do mês).
+                    // 3. Dados e Segurança
+                    Text(
+                        "3. Dados e Segurança",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "Suas senhas são criptografadas antes de serem enviadas ao nosso banco de dados. Não armazenamos sua Senha Mestre em texto simples. Proteja seu dispositivo e senha.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 16.sp
+                    )
 
-                        4️⃣ Segurança (ou perto disso porque é mínima)
-                        Prometemos guardar suas senhas com a maior segurança possível (leia-se: senha123 guardada em um post-it digital). Se der ruim, a culpa é sua por confiar KKKKKKKKKKKKKKK.
+                    // 4. Privacidade
+                    Text(
+                        "4. Privacidade",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "Coletamos apenas Nome, E-mail, UID e identificador do dispositivo. Suas senhas ficam armazenadas apenas em formato criptografado. Dados vinculados à sua conta serão excluídos permanentemente se você solicitar remoção.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 16.sp
+                    )
 
-                        5️⃣ Responsabilidades
-                        Você é 100% responsável por tudo que fizer. Se esquecer a senha ou bloquear sua conta, não adianta mandar mensagem chorando. Ninguém vai responder. Mentira, NÓS respondemos… depois de 30 dias úteis
+                    // 5. Responsabilidade
+                    Text(
+                        "5. Responsabilidade",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "O SuperID é fornecido “no estado em que se encontra”, sem garantias. Não nos responsabilizamos por perdas diretas ou indiretas decorrentes do uso do aplicativo.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 16.sp
+                    )
 
-                        6️⃣ Alterações nos Termos
-                        A gente pode mudar tudo isso aqui sem avisar. Pode ser amanhã, pode ser agora mesmo enquanto você lê. É a vida. Não gostou? sente, chore e faça o L
-
-                        7️⃣ Considerações Finais
-                        Ao clicar em “Aceito”, você basicamente nos dá a sua alma e do seu ente querido de maior preferencia, um rim, metade do fígado e 4 pontos extras nossa minha ficha do D&D 5e, obrigado mestre.
-                        """.trimIndent()
+                    // 6. Contato
+                    Text(
+                        "6. Contato",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "Em caso de dúvidas, envie e-mail para: suporte@superid.com.br (e-mail 100% fictício, não tente contactar)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 16.sp
                     )
                 }
             },
@@ -247,7 +462,7 @@ fun RegisterScreen(navController: NavController) {
     }
 }
 
-// função de hashing no mesmo arquivo
+    // Função de hashing no mesmo arquivo
 private fun hashPassword(senha: String): String {
     val bytes = MessageDigest.getInstance("SHA-256").digest(senha.toByteArray())
     return bytes.joinToString("") { "%02x".format(it) }
