@@ -98,6 +98,15 @@ private fun CameraContent(navController: NavController) {
 
     LaunchedEffect(scannedValue) {
         scannedValue?.let { qrCode ->
+            // Adição: Verificação de autenticação
+            val user = auth.currentUser
+            if (user == null) {
+                partnerName = "Autenticação necessária"
+                showConfirmation = true
+                scannedValue = null
+                return@let
+            }
+
             try {
                 val document = firestore.collection("logins").document(qrCode).get().await()
                 if (document.exists() && document.getString("status") != "completed") {
@@ -173,14 +182,17 @@ private fun CameraContent(navController: NavController) {
         if (showConfirmation) {
             ConfirmationDialog(
                 partnerName = partnerName,
-                onConfirm = { confirmLogin() },
+                onConfirm = {
+                    if (partnerName == "Autenticação necessária") {
+                        navController.navigate("login")
+                    } else {
+                        confirmLogin()
+                    }
+                },
                 onCancel = {
                     scannedValue?.let {
                         firestore.collection("logins").document(it)
-                            .update("tentativas",FieldValue.increment(-1)
-                            )
-
-
+                            .update("tentativas", FieldValue.increment(-1))
                     }
                     showConfirmation = false
                     scannedValue = null
@@ -208,10 +220,6 @@ private fun CameraContent(navController: NavController) {
     }
 }
 
-
-
-
-
 @Composable
 private fun ConfirmationDialog(
     partnerName: String,
@@ -230,44 +238,55 @@ private fun ConfirmationDialog(
             modifier = Modifier.padding(24.dp)
         ) {
             Text(
-                text = "Confirme o Login",
+                text = if (partnerName == "Autenticação necessária") "Autenticação Requerida" else "Confirme o Login",
                 fontSize = 14.sp,
                 color = Color.White,
                 fontWeight = FontWeight.Normal
             )
-            Text(
-                text = "Logar em:",
-                fontSize = 14.sp,
-                color = Color.White,
-                fontWeight = FontWeight.Normal
-            )
+
+            if (partnerName != "Autenticação necessária") {
+                Text(
+                    text = "Logar em:",
+                    fontSize = 14.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Normal
+                )
+            }
+
             Text(
                 text = partnerName,
                 fontSize = 12.sp,
                 color = Color(0xFFB0B0B0),
                 fontWeight = FontWeight.Light
             )
+
             Button(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(Color(0xFFD40000)),
+                colors = ButtonDefaults.buttonColors(
+                    if (partnerName == "Autenticação necessária") Color(0xFF007AFF) else Color(0xFFD40000)
+                ),
                 modifier = Modifier
                     .padding(top = 8.dp)
                     .width(160.dp)
                     .height(48.dp)
             ) {
                 Text(
-                    text = "Confirmar",
+                    text = if (partnerName == "Autenticação necessária") "Fazer Login" else "Confirmar",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
             }
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "Site errado?",
+                    text = when {
+                        partnerName == "Autenticação necessária" -> "Deseja continuar?"
+                        else -> "Site errado?"
+                    },
                     fontSize = 12.sp,
                     color = Color(0xFFB0B0B0)
                 )
@@ -279,7 +298,7 @@ private fun ConfirmationDialog(
                         .padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "Cancelar",
+                        text = if (partnerName == "Autenticação necessária") "Cancelar" else "Cancelar",
                         fontSize = 12.sp,
                         color = Color.Black
                     )
